@@ -3,12 +3,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
-// GitHub Pages serves project sites from /<repo-name>/, so the base path
-// must match the repo name in production builds while staying "/" for dev.
-const base = process.env.GITHUB_PAGES === "true" ? "/medisc/" : "/";
-
 export default defineConfig({
-  base,
   server: {
     // Forwards API calls to `wrangler dev` (run alongside `pnpm dev`) so the
     // frontend can talk to the Worker/D1 backend during local development.
@@ -26,8 +21,8 @@ export default defineConfig({
         name: "Medisc",
         short_name: "Medisc",
         description: "Medisc — installable progressive web app.",
-        start_url: base,
-        scope: base,
+        start_url: "/",
+        scope: "/",
         display: "standalone",
         theme_color: "#2e6e4e",
         background_color: "#f6f7f5",

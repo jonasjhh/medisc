@@ -32,8 +32,8 @@ The goal is a udisc-style scorecard without the bloat.
   **@cloudflare/vitest-pool-workers** for real Worker + D1 integration tests
 - **Playwright** for end-to-end tests, including a PWA installability check
 - **ESLint + Prettier** for linting/formatting
-- **GitHub Actions** for CI and deployment to **GitHub Pages** (static
-  frontend preview; see below for the full Worker + D1 deployment)
+- **GitHub Actions** for CI and deployment (Cloudflare Worker + D1; see
+  below)
 
 ## Getting started
 
@@ -195,19 +195,6 @@ To deploy manually instead (e.g. from your own machine):
 pnpm db:migrate:remote
 pnpm worker:deploy
 ```
-
-Note: the GitHub Pages workflow below only hosts the static frontend, so
-`/api/*` calls will fail there — deploy via Cloudflare Workers (above) to
-get the full app with a working backend.
-
-## Deployment (GitHub Pages preview)
-
-Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds the
-app with `GITHUB_PAGES=true` (so Vite's `base` matches the `/medisc/` project
-path) and publishes `dist/` to GitHub Pages via `actions/deploy-pages`.
-
-In the repository settings, set **Settings → Pages → Source** to
-**GitHub Actions**.
 
 Every push and pull request also runs `.github/workflows/ci.yml`: lint,
 format check, typecheck, frontend unit tests with coverage, Worker API
