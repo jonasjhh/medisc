@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
+import DeleteIcon from "@mui/icons-material/Delete";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
 import FormControl from "@mui/material/FormControl";
+import IconButton from "@mui/material/IconButton";
 import InputLabel from "@mui/material/InputLabel";
 import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
 import MenuItem from "@mui/material/MenuItem";
@@ -19,7 +27,7 @@ import { listCourses } from "../courses/api";
 import type { CourseSummary } from "../courses/api";
 import { listPlayers } from "../players/api";
 import type { Player } from "../players/api";
-import { listRounds } from "./api";
+import { deleteRound, listRounds } from "./api";
 import type { RoundFilters, RoundSummary } from "./api";
 
 type Status = "loading" | "ready" | "error";
@@ -36,6 +44,9 @@ export function RoundsListPage() {
   );
   const [playerFilter, setPlayerFilter] = useState<number | "">("");
   const [courseFilter, setCourseFilter] = useState<number | "">("");
+
+  const [deleteTarget, setDeleteTarget] = useState<RoundSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -66,6 +77,23 @@ export function RoundsListPage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteRound(deleteTarget.id);
+      setRounds((prev) => prev.filter((round) => round.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete round");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <Container maxWidth="sm" sx={{ py: 4 }}>
@@ -146,27 +174,46 @@ export function RoundsListPage() {
         </FormControl>
       </Stack>
 
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
       {status === "loading" && <CircularProgress />}
-      {status === "error" && <Alert severity="error">{error}</Alert>}
 
       {status === "ready" && (
         <List component={Paper} variant="outlined" disablePadding>
           {rounds.map((round) => (
-            <ListItemButton
+            <ListItem
               key={round.id}
-              component={RouterLink}
-              to={`/rounds/${round.id}`}
+              disablePadding
+              secondaryAction={
+                <IconButton
+                  edge="end"
+                  aria-label={`delete round: ${round.courseName} — ${round.layoutName}`}
+                  onClick={() => setDeleteTarget(round)}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              }
             >
-              <ListItemText
-                primary={`${round.courseName} — ${round.layoutName}`}
-                secondary={`${round.playerCount} player${round.playerCount === 1 ? "" : "s"}`}
-              />
-              <Chip
-                label={round.completedAt ? "Completed" : "In progress"}
-                color={round.completedAt ? "success" : "default"}
-                size="small"
-              />
-            </ListItemButton>
+              <ListItemButton
+                component={RouterLink}
+                to={`/rounds/${round.id}`}
+                sx={{ pr: 6 }}
+              >
+                <ListItemText
+                  primary={`${round.courseName} — ${round.layoutName}`}
+                  secondary={`${round.playerCount} player${round.playerCount === 1 ? "" : "s"}`}
+                />
+                <Chip
+                  label={round.completedAt ? "Completed" : "In progress"}
+                  color={round.completedAt ? "success" : "default"}
+                  size="small"
+                />
+              </ListItemButton>
+            </ListItem>
           ))}
           {rounds.length === 0 && (
             <Typography color="text.secondary" sx={{ p: 2 }}>
@@ -175,6 +222,34 @@ export function RoundsListPage() {
           )}
         </List>
       )}
+
+      <Dialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+      >
+        <DialogTitle>Delete this round?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This permanently removes{" "}
+            {deleteTarget && (
+              <>
+                {deleteTarget.courseName} — {deleteTarget.layoutName}
+              </>
+            )}{" "}
+            and every score recorded for it. This can't be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
+          <Button
+            color="error"
+            disabled={deleting}
+            onClick={() => void handleDelete()}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

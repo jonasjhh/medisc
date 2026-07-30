@@ -299,7 +299,7 @@ describe("RoundPage", () => {
     );
   });
 
-  it("swaps a single player with the per-row swap control", async () => {
+  it("swaps a single player with the standalone swap button", async () => {
     vi.mocked(roundsApi.updateRound).mockResolvedValue({
       ...baseRound,
       players: [{ id: 2, name: "Bob" }],
@@ -312,14 +312,37 @@ describe("RoundPage", () => {
     renderPage();
 
     await screen.findByText("Hole 1");
-    await user.click(screen.getByRole("button", { name: /manage players/i }));
-
-    await user.click(await screen.findByLabelText("Swap for"));
-    await user.click(await screen.findByRole("option", { name: "Bob" }));
-    await user.click(screen.getByRole("button", { name: /save players/i }));
+    await user.click(screen.getByRole("button", { name: /swap alice/i }));
+    await user.click(await screen.findByRole("menuitem", { name: "Bob" }));
 
     expect(roundsApi.updateRound).toHaveBeenCalledWith(1, {
       playerIds: [2],
     });
+    await waitFor(() =>
+      expect(screen.getAllByText("Bob").length).toBeGreaterThan(0),
+    );
+  });
+
+  it("disables the swap button when there is nobody else to swap in", async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [{ id: 1, name: "Alice", createdAt: "", roundCount: 1 }],
+    });
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    expect(screen.getByRole("button", { name: /swap alice/i })).toBeDisabled();
+  });
+
+  it("does not offer to swap players on a completed round", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+    });
+    renderPage();
+
+    await screen.findByText("Completed");
+    expect(
+      screen.queryByRole("button", { name: /swap alice/i }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,6 +13,7 @@ vi.mock("./api");
 
 describe("RoundsListPage", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
       players: [{ id: 1, name: "Alice", createdAt: "", roundCount: 1 }],
     });
@@ -104,5 +105,76 @@ describe("RoundsListPage", () => {
       playerId: undefined,
       courseId: undefined,
     });
+  });
+
+  it("deletes a round after confirming in the dialog", async () => {
+    vi.mocked(roundsApi.listRounds).mockResolvedValue({
+      rounds: [
+        {
+          id: 1,
+          createdAt: "",
+          completedAt: null,
+          counting: true,
+          courseName: "Maple Hill",
+          layoutName: "Blue",
+          playerCount: 2,
+        },
+      ],
+    });
+    vi.mocked(roundsApi.deleteRound).mockResolvedValue(undefined);
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <RoundsListPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Maple Hill — Blue");
+    await user.click(
+      screen.getByRole("button", { name: /delete round: maple hill/i }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /delete/i }));
+
+    expect(roundsApi.deleteRound).toHaveBeenCalledWith(1);
+    await waitFor(() =>
+      expect(screen.queryByText("Maple Hill — Blue")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("cancels round deletion without calling the API", async () => {
+    vi.mocked(roundsApi.listRounds).mockResolvedValue({
+      rounds: [
+        {
+          id: 1,
+          createdAt: "",
+          completedAt: null,
+          counting: true,
+          courseName: "Maple Hill",
+          layoutName: "Blue",
+          playerCount: 2,
+        },
+      ],
+    });
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <RoundsListPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Maple Hill — Blue");
+    await user.click(
+      screen.getByRole("button", { name: /delete round: maple hill/i }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
+
+    expect(roundsApi.deleteRound).not.toHaveBeenCalled();
+    expect(screen.getByText("Maple Hill — Blue")).toBeInTheDocument();
   });
 });

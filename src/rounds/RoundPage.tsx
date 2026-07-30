@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -14,18 +15,17 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
-import FormControl from "@mui/material/FormControl";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import FormGroup from "@mui/material/FormGroup";
 import IconButton from "@mui/material/IconButton";
-import InputLabel from "@mui/material/InputLabel";
+import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
-import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { listPlayers } from "../players/api";
 import type { Player } from "../players/api";
@@ -37,7 +37,7 @@ import {
   updateHoleScore,
   updateRound,
 } from "./api";
-import type { RoundDetail } from "./api";
+import type { RoundDetail, RoundPlayer } from "./api";
 import { ScoreAdjuster } from "./ScoreAdjuster";
 
 type Status = "loading" | "ready" | "error";
@@ -62,6 +62,12 @@ export function RoundPage() {
     new Set(),
   );
   const [savingPlayers, setSavingPlayers] = useState(false);
+
+  const [swapMenu, setSwapMenu] = useState<{
+    anchorEl: HTMLElement;
+    player: RoundPlayer;
+  } | null>(null);
+  const [swapping, setSwapping] = useState(false);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -199,15 +205,6 @@ export function RoundPage() {
     });
   };
 
-  const swapPlayer = (currentPlayerId: number, replacementPlayerId: number) => {
-    setSelectedPlayerIds((prev) => {
-      const next = new Set(prev);
-      next.delete(currentPlayerId);
-      next.add(replacementPlayerId);
-      return next;
-    });
-  };
-
   const handleSavePlayers = async () => {
     if (selectedPlayerIds.size === 0) {
       return;
@@ -224,6 +221,29 @@ export function RoundPage() {
       setError(err instanceof Error ? err.message : "Failed to update players");
     } finally {
       setSavingPlayers(false);
+    }
+  };
+
+  const handleSwapPlayer = async (
+    currentPlayerId: number,
+    replacementPlayerId: number,
+  ) => {
+    if (!round) {
+      return;
+    }
+    setSwapMenu(null);
+    setSwapping(true);
+    setError(null);
+    try {
+      const nextPlayerIds = round.players.map((player) =>
+        player.id === currentPlayerId ? replacementPlayerId : player.id,
+      );
+      const updated = await updateRound(id, { playerIds: nextPlayerIds });
+      setRound(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to swap player");
+    } finally {
+      setSwapping(false);
     }
   };
 
@@ -249,8 +269,9 @@ export function RoundPage() {
   const isCompleted = round.completedAt !== null;
   const birdieValue = Math.max(1, hole.par - 1);
   const bogeyValue = hole.par + 1;
-  const unselectedPlayers = allPlayers.filter(
-    (player) => !selectedPlayerIds.has(player.id),
+  const playersNotInRound = allPlayers.filter(
+    (player) =>
+      !round.players.some((roundPlayer) => roundPlayer.id === player.id),
   );
 
   return (
@@ -325,51 +346,18 @@ export function RoundPage() {
         {editingPlayers ? (
           <>
             <FormGroup>
-              {allPlayers.map((player) => {
-                const isSelected = selectedPlayerIds.has(player.id);
-                return (
-                  <Stack
-                    key={player.id}
-                    direction="row"
-                    alignItems="center"
-                    spacing={1}
-                    flexWrap="wrap"
-                    rowGap={0.5}
-                  >
-                    <FormControlLabel
-                      sx={{ flexGrow: 1, mr: 0 }}
-                      control={
-                        <Checkbox
-                          checked={isSelected}
-                          onChange={() => togglePlayer(player.id)}
-                        />
-                      }
-                      label={player.name}
+              {allPlayers.map((player) => (
+                <FormControlLabel
+                  key={player.id}
+                  control={
+                    <Checkbox
+                      checked={selectedPlayerIds.has(player.id)}
+                      onChange={() => togglePlayer(player.id)}
                     />
-                    {isSelected && unselectedPlayers.length > 0 && (
-                      <FormControl size="small" sx={{ minWidth: 150 }}>
-                        <InputLabel id={`swap-${player.id}-label`}>
-                          Swap for
-                        </InputLabel>
-                        <Select
-                          labelId={`swap-${player.id}-label`}
-                          label="Swap for"
-                          value=""
-                          onChange={(event) =>
-                            swapPlayer(player.id, Number(event.target.value))
-                          }
-                        >
-                          {unselectedPlayers.map((candidate) => (
-                            <MenuItem key={candidate.id} value={candidate.id}>
-                              {candidate.name}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    )}
-                  </Stack>
-                );
-              })}
+                  }
+                  label={player.name}
+                />
+              ))}
             </FormGroup>
             <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
               <Button
@@ -386,11 +374,63 @@ export function RoundPage() {
             </Stack>
           </>
         ) : (
-          <Typography color="text.secondary">
-            {round.players.map((player) => player.name).join(", ")}
-          </Typography>
+          <Stack spacing={0.5} sx={{ mt: 1 }}>
+            {round.players.map((player) => (
+              <Stack
+                key={player.id}
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+              >
+                <Typography color="text.secondary">{player.name}</Typography>
+                {!isCompleted && (
+                  <Tooltip
+                    title={
+                      playersNotInRound.length === 0
+                        ? "No other players to swap in"
+                        : `Swap ${player.name} for another player`
+                    }
+                  >
+                    <span>
+                      <IconButton
+                        size="small"
+                        aria-label={`swap ${player.name}`}
+                        disabled={playersNotInRound.length === 0 || swapping}
+                        onClick={(event) =>
+                          setSwapMenu({
+                            anchorEl: event.currentTarget,
+                            player,
+                          })
+                        }
+                      >
+                        <SwapHorizIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                )}
+              </Stack>
+            ))}
+          </Stack>
         )}
       </Paper>
+
+      <Menu
+        anchorEl={swapMenu?.anchorEl ?? null}
+        open={swapMenu !== null}
+        onClose={() => setSwapMenu(null)}
+      >
+        {playersNotInRound.map((candidate) => (
+          <MenuItem
+            key={candidate.id}
+            onClick={() =>
+              swapMenu &&
+              void handleSwapPlayer(swapMenu.player.id, candidate.id)
+            }
+          >
+            {candidate.name}
+          </MenuItem>
+        ))}
+      </Menu>
 
       <Stack
         direction="row"
