@@ -26,6 +26,31 @@ describe("PlayersListPage", () => {
     expect(await screen.findByText("Alice")).toBeInTheDocument();
   });
 
+  it("adds a new player", async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [{ id: 1, name: "Alice", createdAt: "" }],
+    });
+    vi.mocked(playersApi.createPlayer).mockResolvedValue({
+      id: 2,
+      name: "Bob",
+      createdAt: "",
+    });
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <PlayersListPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Alice");
+    await user.type(screen.getByLabelText(/add player/i), "Bob");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(playersApi.createPlayer).toHaveBeenCalledWith("Bob");
+    expect(await screen.findByText("Bob")).toBeInTheDocument();
+  });
+
   it("renames a player", async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
       players: [{ id: 1, name: "Alice", createdAt: "" }],

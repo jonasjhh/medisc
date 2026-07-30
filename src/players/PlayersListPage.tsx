@@ -15,6 +15,7 @@ import ListItemText from "@mui/material/ListItemText";
 import Paper from "@mui/material/Paper";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { AddPlayerForm } from "./AddPlayerForm";
 import { listPlayers, updatePlayer } from "./api";
 import type { Player } from "./api";
 
@@ -68,11 +69,21 @@ export function PlayersListPage() {
     }
   };
 
+  const handlePlayerAdded = (player: Player) => {
+    setPlayers((prev) =>
+      [...prev, player].sort((a, b) => a.name.localeCompare(b.name)),
+    );
+  };
+
   return (
     <Container maxWidth="sm" sx={{ py: 4 }}>
       <Typography variant="h4" component="h1" gutterBottom>
         Players
       </Typography>
+
+      <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
+        <AddPlayerForm onAdded={handlePlayerAdded} />
+      </Paper>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -140,7 +151,7 @@ export function PlayersListPage() {
           ))}
           {players.length === 0 && (
             <Typography color="text.secondary" sx={{ p: 2 }}>
-              No players yet — add one when starting a round.
+              No players yet — add one above.
             </Typography>
           )}
         </List>
