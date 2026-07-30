@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  createPlayer,
+  completeRound,
   createRound,
   getRound,
-  listPlayers,
   listRounds,
   updateHoleScore,
 } from "./api";
@@ -19,24 +18,6 @@ function mockFetchOnce(body: unknown, init: { ok?: boolean } = {}) {
 }
 
 describe("rounds api", () => {
-  it("creates a player", async () => {
-    const fetchMock = mockFetchOnce({ id: 1, name: "Alice", createdAt: "" });
-    await createPlayer("Alice");
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/players",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ name: "Alice" }),
-      }),
-    );
-  });
-
-  it("lists players", async () => {
-    mockFetchOnce({ players: [{ id: 1, name: "Alice", createdAt: "" }] });
-    const { players } = await listPlayers();
-    expect(players).toEqual([{ id: 1, name: "Alice", createdAt: "" }]);
-  });
-
   it("creates a round", async () => {
     const fetchMock = mockFetchOnce({
       id: 1,
@@ -54,10 +35,22 @@ describe("rounds api", () => {
     );
   });
 
-  it("lists rounds", async () => {
-    mockFetchOnce({ rounds: [{ id: 1, courseName: "Maple Hill" }] });
+  it("lists rounds with no filters", async () => {
+    const fetchMock = mockFetchOnce({
+      rounds: [{ id: 1, courseName: "Maple Hill" }],
+    });
     const { rounds } = await listRounds();
     expect(rounds).toEqual([{ id: 1, courseName: "Maple Hill" }]);
+    expect(fetchMock).toHaveBeenCalledWith("/api/rounds", undefined);
+  });
+
+  it("lists rounds with filters as query params", async () => {
+    const fetchMock = mockFetchOnce({ rounds: [] });
+    await listRounds({ status: "completed", playerId: 5, courseId: 9 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rounds?status=completed&playerId=5&courseId=9",
+      undefined,
+    );
   });
 
   it("gets a round's detail", async () => {
@@ -80,6 +73,15 @@ describe("rounds api", () => {
         method: "PATCH",
         body: JSON.stringify({ strokes: 4 }),
       }),
+    );
+  });
+
+  it("completes a round", async () => {
+    const fetchMock = mockFetchOnce({ id: 1, completedAt: "2026-01-01" });
+    await completeRound(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rounds/1/complete",
+      expect.objectContaining({ method: "POST" }),
     );
   });
 });

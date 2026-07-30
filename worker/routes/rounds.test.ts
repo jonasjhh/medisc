@@ -160,4 +160,77 @@ describe("rounds API", () => {
     const res = await request("/api/rounds/999");
     expect(res.status).toBe(404);
   });
+
+  it("finishes a round, setting completedAt", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const created = await json<{ id: number; completedAt: string | null }>(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+    );
+    expect(created.completedAt).toBeNull();
+
+    const res = await request(`/api/rounds/${created.id}/complete`, {
+      method: "POST",
+    });
+    expect(res.status).toBe(200);
+    const completed = await json<{ completedAt: string | null }>(res);
+    expect(completed.completedAt).not.toBeNull();
+  });
+
+  it("404s when finishing a round that doesn't exist", async () => {
+    const res = await request("/api/rounds/999/complete", { method: "POST" });
+    expect(res.status).toBe(404);
+  });
+
+  it("filters the rounds list by status, player, and course", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const otherCourse = await json<{ id: number }>(
+      await request("/api/courses", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Other Course" }),
+      }),
+    );
+    const alice = await createPlayer("Alice");
+    const bob = await createPlayer("Bob");
+
+    const roundA = await json<{ id: number }>(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+    );
+    await request(`/api/rounds/${roundA.id}/complete`, { method: "POST" });
+
+    await request("/api/rounds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courseId, layoutId, playerIds: [bob.id] }),
+    });
+
+    const completedRes = await json<{ rounds: unknown[] }>(
+      await request("/api/rounds?status=completed"),
+    );
+    expect(completedRes.rounds).toHaveLength(1);
+
+    const inProgressRes = await json<{ rounds: unknown[] }>(
+      await request("/api/rounds?status=in_progress"),
+    );
+    expect(inProgressRes.rounds).toHaveLength(1);
+
+    const aliceRes = await json<{ rounds: unknown[] }>(
+      await request(`/api/rounds?playerId=${alice.id}`),
+    );
+    expect(aliceRes.rounds).toHaveLength(1);
+
+    const otherCourseRes = await json<{ rounds: unknown[] }>(
+      await request(`/api/rounds?courseId=${otherCourse.id}`),
+    );
+    expect(otherCourseRes.rounds).toHaveLength(0);
+  });
 });

@@ -14,6 +14,8 @@ import { CourseDetailPage } from "./courses/CourseDetailPage";
 import { NewRoundPage } from "./rounds/NewRoundPage";
 import { RoundPage } from "./rounds/RoundPage";
 import { RoundsListPage } from "./rounds/RoundsListPage";
+import { PlayersListPage } from "./players/PlayersListPage";
+import { PlayerStatsPage } from "./players/PlayerStatsPage";
 import { InstallPrompt } from "./app/InstallPrompt";
 import { UpdatePrompt } from "./app/UpdatePrompt";
 
@@ -34,6 +36,9 @@ function NavBar() {
         </Button>
         <Button color="inherit" component={RouterLink} to="/courses">
           Courses
+        </Button>
+        <Button color="inherit" component={RouterLink} to="/players">
+          Players
         </Button>
       </Toolbar>
     </AppBar>
@@ -56,6 +61,8 @@ export function App() {
         <Route path="/rounds" element={<RoundsListPage />} />
         <Route path="/rounds/new" element={<NewRoundPage />} />
         <Route path="/rounds/:roundId" element={<RoundPage />} />
+        <Route path="/players" element={<PlayersListPage />} />
+        <Route path="/players/:playerId" element={<PlayerStatsPage />} />
       </Routes>
     </BrowserRouter>
   );

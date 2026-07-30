@@ -10,6 +10,7 @@ vi.mock("./api");
 const baseRound: roundsApi.RoundDetail = {
   id: 1,
   createdAt: "",
+  completedAt: null,
   course: { id: 1, name: "Maple Hill" },
   layout: { id: 10, name: "Blue" },
   holes: [
@@ -107,5 +108,38 @@ describe("RoundPage", () => {
     expect(
       screen.getByRole("button", { name: /decrease strokes/i }),
     ).toBeDisabled();
+  });
+
+  it("finishes the round and shows a Completed badge instead of adjusters", async () => {
+    vi.mocked(roundsApi.completeRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: /finish round/i }));
+
+    expect(await screen.findByText("Completed")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /increase strokes/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows a completed round as read-only from the start", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+    });
+    renderPage();
+
+    expect(await screen.findByText("Completed")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /finish round/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /increase strokes/i }),
+    ).not.toBeInTheDocument();
   });
 });

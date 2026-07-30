@@ -12,26 +12,32 @@ async function json<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function request(path: string, init?: RequestInit): Promise<Response> {
+  return app.request(path, init, env);
+}
+
 describe("players API", () => {
   beforeEach(async () => {
+    await env.DB.exec("DELETE FROM hole_scores");
+    await env.DB.exec("DELETE FROM round_players");
+    await env.DB.exec("DELETE FROM rounds");
+    await env.DB.exec("DELETE FROM holes");
+    await env.DB.exec("DELETE FROM layouts");
+    await env.DB.exec("DELETE FROM courses");
     await env.DB.exec("DELETE FROM players");
   });
 
   it("creates and lists players", async () => {
-    const createRes = await app.request(
-      "/api/players",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Jonas" }),
-      },
-      env,
-    );
+    const createRes = await request("/api/players", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Jonas" }),
+    });
     expect(createRes.status).toBe(201);
     const created = await json<PlayerResponse>(createRes);
     expect(created).toMatchObject({ name: "Jonas" });
 
-    const listRes = await app.request("/api/players", {}, env);
+    const listRes = await request("/api/players");
     const { players } = await json<{ players: PlayerResponse[] }>(listRes);
     expect(players).toEqual([
       { id: created.id, name: "Jonas", createdAt: created.createdAt },
@@ -39,15 +45,158 @@ describe("players API", () => {
   });
 
   it("rejects an empty name", async () => {
-    const res = await app.request(
-      "/api/players",
-      {
+    const res = await request("/api/players", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "" }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("player stats", () => {
+  beforeEach(async () => {
+    await env.DB.exec("DELETE FROM hole_scores");
+    await env.DB.exec("DELETE FROM round_players");
+    await env.DB.exec("DELETE FROM rounds");
+    await env.DB.exec("DELETE FROM holes");
+    await env.DB.exec("DELETE FROM layouts");
+    await env.DB.exec("DELETE FROM courses");
+    await env.DB.exec("DELETE FROM players");
+  });
+
+  async function setUpCourseWithOneHole() {
+    const course = await json<{ id: number }>(
+      await request("/api/courses", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "" }),
-      },
-      env,
+        body: JSON.stringify({ name: "Maple Hill" }),
+      }),
     );
+    const layout = await json<{ id: number }>(
+      await request(`/api/courses/${course.id}/layouts`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Blue" }),
+      }),
+    );
+    await request(`/api/layouts/${layout.id}/holes`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ number: 1, par: 3 }),
+    });
+    return { courseId: course.id, layoutId: layout.id };
+  }
+
+  async function playRound(
+    courseId: number,
+    layoutId: number,
+    playerId: number,
+    strokes: number,
+  ) {
+    const round = await json<{
+      id: number;
+      scores: Array<{ id: number }>;
+    }>(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [playerId] }),
+      }),
+    );
+    await request(`/api/hole-scores/${round.scores[0].id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ strokes }),
+    });
+    await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
+  }
+
+  it("lists the layouts a player has completed rounds on", async () => {
+    const { courseId, layoutId } = await setUpCourseWithOneHole();
+    const player = await json<{ id: number }>(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+    );
+
+    expect(
+      (
+        await json<{ layouts: unknown[] }>(
+          await request(`/api/players/${player.id}/layouts`),
+        )
+      ).layouts,
+    ).toHaveLength(0);
+
+    await playRound(courseId, layoutId, player.id, 4);
+
+    const { layouts } = await json<{
+      layouts: Array<{ courseName: string; layoutName: string }>;
+    }>(await request(`/api/players/${player.id}/layouts`));
+    expect(layouts).toEqual([
+      { courseId, courseName: "Maple Hill", layoutId, layoutName: "Blue" },
+    ]);
+  });
+
+  it("aggregates hole stats across completed rounds only", async () => {
+    const { courseId, layoutId } = await setUpCourseWithOneHole();
+    const player = await json<{ id: number }>(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+    );
+
+    await playRound(courseId, layoutId, player.id, 4);
+    await playRound(courseId, layoutId, player.id, 2);
+    // An in-progress (not completed) round shouldn't count towards stats.
+    await request("/api/rounds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courseId, layoutId, playerIds: [player.id] }),
+    });
+
+    const { holes } = await json<{
+      holes: Array<{
+        number: number;
+        timesPlayed: number;
+        avgStrokes: number;
+        bestStrokes: number;
+        worstStrokes: number;
+      }>;
+    }>(await request(`/api/players/${player.id}/stats?layoutId=${layoutId}`));
+
+    expect(holes).toEqual([
+      {
+        number: 1,
+        timesPlayed: 2,
+        avgStrokes: 3,
+        bestStrokes: 2,
+        worstStrokes: 4,
+        avgPenalties: 0,
+        holeId: expect.any(Number),
+        par: 3,
+      },
+    ]);
+  });
+
+  it("404s for a player that doesn't exist", async () => {
+    const res = await request("/api/players/999/layouts");
+    expect(res.status).toBe(404);
+  });
+
+  it("requires a layoutId for stats", async () => {
+    const player = await json<{ id: number }>(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+    );
+    const res = await request(`/api/players/${player.id}/stats`);
     expect(res.status).toBe(400);
   });
 });

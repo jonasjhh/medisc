@@ -38,6 +38,7 @@ async function setUpRoundWithOneScore() {
     }),
   );
   const round = await json<{
+    id: number;
     scores: Array<{ id: number; strokes: number; penalties: number }>;
   }>(
     await request("/api/rounds", {
@@ -50,7 +51,7 @@ async function setUpRoundWithOneScore() {
       }),
     }),
   );
-  return round.scores[0];
+  return { roundId: round.id, score: round.scores[0] };
 }
 
 describe("hole-scores API", () => {
@@ -65,7 +66,7 @@ describe("hole-scores API", () => {
   });
 
   it("updates strokes only", async () => {
-    const score = await setUpRoundWithOneScore();
+    const { score } = await setUpRoundWithOneScore();
     expect(score).toMatchObject({ strokes: 3, penalties: 0 });
 
     const res = await request(`/api/hole-scores/${score.id}`, {
@@ -79,7 +80,7 @@ describe("hole-scores API", () => {
   });
 
   it("updates penalties only, leaving strokes untouched", async () => {
-    const score = await setUpRoundWithOneScore();
+    const { score } = await setUpRoundWithOneScore();
 
     const res = await request(`/api/hole-scores/${score.id}`, {
       method: "PATCH",
@@ -100,7 +101,7 @@ describe("hole-scores API", () => {
   });
 
   it("rejects strokes below 1", async () => {
-    const score = await setUpRoundWithOneScore();
+    const { score } = await setUpRoundWithOneScore();
 
     const res = await request(`/api/hole-scores/${score.id}`, {
       method: "PATCH",
@@ -111,7 +112,7 @@ describe("hole-scores API", () => {
   });
 
   it("rejects a body with neither field", async () => {
-    const score = await setUpRoundWithOneScore();
+    const { score } = await setUpRoundWithOneScore();
 
     const res = await request(`/api/hole-scores/${score.id}`, {
       method: "PATCH",
@@ -119,5 +120,17 @@ describe("hole-scores API", () => {
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(400);
+  });
+
+  it("rejects edits once the round is completed", async () => {
+    const { roundId, score } = await setUpRoundWithOneScore();
+    await request(`/api/rounds/${roundId}/complete`, { method: "POST" });
+
+    const res = await request(`/api/hole-scores/${score.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ strokes: 5 }),
+    });
+    expect(res.status).toBe(409);
   });
 });

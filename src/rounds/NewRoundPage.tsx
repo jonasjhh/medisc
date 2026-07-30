@@ -18,8 +18,9 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { getCourse, listCourses } from "../courses/api";
 import type { CourseDetail, CourseSummary } from "../courses/api";
-import { createPlayer, createRound, listPlayers } from "./api";
-import type { Player } from "./api";
+import { createPlayer, listPlayers } from "../players/api";
+import type { Player } from "../players/api";
+import { createRound } from "./api";
 
 type Status = "loading" | "ready" | "error";
 

@@ -85,6 +85,13 @@ D1 database bound as `DB` in `wrangler.toml`:
 
 - `POST /api/players` — body `{ name }` → adds a player to the roster.
 - `GET /api/players` — lists all players.
+- `GET /api/players/:playerId/layouts` — distinct course/layout combos the
+  player has *completed* rounds on, for populating a stats filter. 404s if
+  the player doesn't exist.
+- `GET /api/players/:playerId/stats?layoutId=` — per-hole aggregates
+  (times played, avg/best/worst strokes, avg penalties) across the
+  player's completed rounds on that layout only. 400s without a
+  `layoutId`, 404s if the player doesn't exist.
 
 **Rounds** (`worker/routes/rounds.ts`)
 
@@ -93,19 +100,26 @@ D1 database bound as `DB` in `wrangler.toml`:
   hole, and returns the full round detail (course, layout, holes, players,
   scores). 404s if the layout doesn't belong to the course, or if any
   player id doesn't exist.
-- `GET /api/rounds` — lists rounds (course/layout name, player count),
-  newest first.
+- `GET /api/rounds` — lists rounds (course/layout name, player count,
+  completion state), newest first. Supports `?status=completed`
+  /`?status=in_progress`, `?playerId=`, and `?courseId=` filters,
+  combinable and all optional.
 - `GET /api/rounds/:roundId` — the same detail shape `POST` returns, for
   resuming a round already in progress.
+- `POST /api/rounds/:roundId/complete` — marks the round done (sets
+  `completedAt`), locking its scores from further edits. 404s if the round
+  doesn't exist.
 
 **Hole scores** (`worker/routes/holeScores.ts`)
 
 - `PATCH /api/hole-scores/:id` — body `{ strokes?, penalties? }` → updates
   one player's score for one hole. Either field alone is fine (the other is
-  left as-is); `strokes` can't go below 1, `penalties` not below 0.
+  left as-is); `strokes` can't go below 1, `penalties` not below 0. 409s if
+  the round it belongs to has already been completed.
 
-The frontend lives in `src/courses/` (`/courses`, `/courses/:courseId`) and
-`src/rounds/` (`/rounds`, `/rounds/new`, `/rounds/:roundId`).
+The frontend lives in `src/courses/` (`/courses`, `/courses/:courseId`),
+`src/rounds/` (`/rounds`, `/rounds/new`, `/rounds/:roundId`), and
+`src/players/` (`/players`, `/players/:playerId` for per-layout stats).
 
 `wrangler.toml` also serves the built frontend (`dist/`) as static assets,
 so the Worker is the single deployable that hosts both the API and the app.

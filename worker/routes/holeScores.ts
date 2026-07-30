@@ -26,12 +26,24 @@ holeScoresRoute.patch("/:id", async (c) => {
   }
 
   const existing = await c.env.DB.prepare(
-    "SELECT id, strokes, penalties FROM hole_scores WHERE id = ?",
+    `SELECT hole_scores.id, hole_scores.strokes, hole_scores.penalties,
+            rounds.completed_at
+     FROM hole_scores
+     JOIN rounds ON rounds.id = hole_scores.round_id
+     WHERE hole_scores.id = ?`,
   )
     .bind(id)
-    .first<{ id: number; strokes: number; penalties: number }>();
+    .first<{
+      id: number;
+      strokes: number;
+      penalties: number;
+      completed_at: string | null;
+    }>();
   if (!existing) {
     return c.json({ error: "Hole score not found" }, 404);
+  }
+  if (existing.completed_at) {
+    return c.json({ error: "Cannot edit a completed round" }, 409);
   }
 
   const strokes = parsed.data.strokes ?? existing.strokes;

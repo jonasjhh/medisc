@@ -5,13 +5,14 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
 import IconButton from "@mui/material/IconButton";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { getRound, updateHoleScore } from "./api";
+import { completeRound, getRound, updateHoleScore } from "./api";
 import type { RoundDetail } from "./api";
 import { ScoreAdjuster } from "./ScoreAdjuster";
 
@@ -26,6 +27,7 @@ export function RoundPage() {
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
   const [holeIndex, setHoleIndex] = useState(0);
+  const [finishing, setFinishing] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -71,6 +73,19 @@ export function RoundPage() {
     }
   };
 
+  const handleFinish = async () => {
+    setFinishing(true);
+    setError(null);
+    try {
+      const updated = await completeRound(id);
+      setRound(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to finish round");
+    } finally {
+      setFinishing(false);
+    }
+  };
+
   if (status === "loading") {
     return (
       <Container maxWidth="sm" sx={{ py: 4 }}>
@@ -90,6 +105,7 @@ export function RoundPage() {
   const hole = round.holes[holeIndex];
   const isFirstHole = holeIndex === 0;
   const isLastHole = holeIndex === round.holes.length - 1;
+  const isCompleted = round.completedAt !== null;
 
   return (
     <Container maxWidth="sm" sx={{ py: 4 }}>
@@ -97,9 +113,28 @@ export function RoundPage() {
         ← Rounds
       </Button>
 
-      <Typography variant="h5" component="h1" gutterBottom>
-        {round.course.name} — {round.layout.name}
-      </Typography>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="flex-start"
+        spacing={2}
+      >
+        <Typography variant="h5" component="h1" gutterBottom>
+          {round.course.name} — {round.layout.name}
+        </Typography>
+        {isCompleted ? (
+          <Chip label="Completed" color="success" size="small" />
+        ) : (
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={finishing}
+            onClick={() => void handleFinish()}
+          >
+            Finish round
+          </Button>
+        )}
+      </Stack>
 
       <Stack
         direction="row"
@@ -151,6 +186,7 @@ export function RoundPage() {
                   label="Strokes"
                   value={score.strokes}
                   min={1}
+                  readOnly={isCompleted}
                   onDecrement={() => void adjust(score.id, "strokes", -1)}
                   onIncrement={() => void adjust(score.id, "strokes", 1)}
                 />
@@ -158,6 +194,7 @@ export function RoundPage() {
                   label="Penalties"
                   value={score.penalties}
                   min={0}
+                  readOnly={isCompleted}
                   onDecrement={() => void adjust(score.id, "penalties", -1)}
                   onIncrement={() => void adjust(score.id, "penalties", 1)}
                 />

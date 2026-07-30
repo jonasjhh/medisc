@@ -4,14 +4,16 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NewRoundPage } from "./NewRoundPage";
 import * as coursesApi from "../courses/api";
+import * as playersApi from "../players/api";
 import * as roundsApi from "./api";
 
 vi.mock("../courses/api");
+vi.mock("../players/api");
 vi.mock("./api");
 
 describe("NewRoundPage", () => {
   beforeEach(() => {
-    vi.mocked(roundsApi.listPlayers).mockResolvedValue({
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
       players: [{ id: 1, name: "Alice", createdAt: "" }],
     });
     vi.mocked(coursesApi.listCourses).mockResolvedValue({
@@ -37,7 +39,7 @@ describe("NewRoundPage", () => {
   }
 
   it("lets you add a new player", async () => {
-    vi.mocked(roundsApi.createPlayer).mockResolvedValue({
+    vi.mocked(playersApi.createPlayer).mockResolvedValue({
       id: 2,
       name: "Bob",
       createdAt: "",
@@ -49,7 +51,7 @@ describe("NewRoundPage", () => {
     await user.type(screen.getByLabelText(/add player/i), "Bob");
     await user.click(screen.getByRole("button", { name: "Add" }));
 
-    expect(roundsApi.createPlayer).toHaveBeenCalledWith("Bob");
+    expect(playersApi.createPlayer).toHaveBeenCalledWith("Bob");
     expect(await screen.findByText("Bob")).toBeInTheDocument();
   });
 
@@ -57,6 +59,7 @@ describe("NewRoundPage", () => {
     vi.mocked(roundsApi.createRound).mockResolvedValue({
       id: 5,
       createdAt: "",
+      completedAt: null,
       course: { id: 1, name: "Maple Hill" },
       layout: { id: 10, name: "Blue" },
       holes: [],

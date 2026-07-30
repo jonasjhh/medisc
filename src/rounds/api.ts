@@ -1,14 +1,9 @@
 import { patchJson, postJson, request } from "../api/client";
 
-export interface Player {
-  id: number;
-  name: string;
-  createdAt: string;
-}
-
 export interface RoundSummary {
   id: number;
   createdAt: string;
+  completedAt: string | null;
   courseName: string;
   layoutName: string;
   playerCount: number;
@@ -37,6 +32,7 @@ export interface RoundScore {
 export interface RoundDetail {
   id: number;
   createdAt: string;
+  completedAt: string | null;
   course: { id: number; name: string };
   layout: { id: number; name: string };
   holes: RoundHole[];
@@ -44,16 +40,27 @@ export interface RoundDetail {
   scores: RoundScore[];
 }
 
-export function listPlayers(): Promise<{ players: Player[] }> {
-  return request("/api/players");
+export interface RoundFilters {
+  status?: "in_progress" | "completed";
+  playerId?: number;
+  courseId?: number;
 }
 
-export function createPlayer(name: string): Promise<Player> {
-  return postJson("/api/players", { name });
-}
-
-export function listRounds(): Promise<{ rounds: RoundSummary[] }> {
-  return request("/api/rounds");
+export function listRounds(
+  filters: RoundFilters = {},
+): Promise<{ rounds: RoundSummary[] }> {
+  const params = new URLSearchParams();
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+  if (filters.playerId) {
+    params.set("playerId", String(filters.playerId));
+  }
+  if (filters.courseId) {
+    params.set("courseId", String(filters.courseId));
+  }
+  const query = params.toString();
+  return request(`/api/rounds${query ? `?${query}` : ""}`);
 }
 
 export function createRound(input: {
@@ -73,4 +80,8 @@ export function updateHoleScore(
   input: { strokes?: number; penalties?: number },
 ): Promise<RoundScore> {
   return patchJson(`/api/hole-scores/${holeScoreId}`, input);
+}
+
+export function completeRound(roundId: number): Promise<RoundDetail> {
+  return postJson(`/api/rounds/${roundId}/complete`, {});
 }

@@ -7,11 +7,13 @@ interface RoundRow {
   course_id: number;
   layout_id: number;
   created_at: string;
+  completed_at: string | null;
 }
 
 interface RoundListRow {
   id: number;
   created_at: string;
+  completed_at: string | null;
   course_name: string;
   layout_name: string;
   player_count: number;
@@ -41,6 +43,7 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
   const round = await db
     .prepare(
       `SELECT rounds.id, rounds.course_id, rounds.layout_id, rounds.created_at,
+              rounds.completed_at,
               courses.name AS course_name, layouts.name AS layout_name
        FROM rounds
        JOIN courses ON courses.id = rounds.course_id
@@ -86,6 +89,7 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
   return {
     id: round.id,
     createdAt: round.created_at,
+    completedAt: round.completed_at,
     course: { id: round.course_id, name: round.course_name },
     layout: { id: round.layout_id, name: round.layout_name },
     holes: holeRows.map((hole) => ({
@@ -174,22 +178,54 @@ roundsRoute.post("/", async (c) => {
 });
 
 roundsRoute.get("/", async (c) => {
+  const status = c.req.query("status");
+  const playerId = c.req.query("playerId");
+  const courseId = c.req.query("courseId");
+
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (status === "completed") {
+    conditions.push("rounds.completed_at IS NOT NULL");
+  } else if (status === "in_progress") {
+    conditions.push("rounds.completed_at IS NULL");
+  }
+
+  if (playerId) {
+    conditions.push(
+      "rounds.id IN (SELECT round_id FROM round_players WHERE player_id = ?)",
+    );
+    params.push(Number(playerId));
+  }
+
+  if (courseId) {
+    conditions.push("rounds.course_id = ?");
+    params.push(Number(courseId));
+  }
+
+  const where =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
   const { results } = await c.env.DB.prepare(
-    `SELECT rounds.id, rounds.created_at,
+    `SELECT rounds.id, rounds.created_at, rounds.completed_at,
             courses.name AS course_name, layouts.name AS layout_name,
             COUNT(DISTINCT round_players.player_id) AS player_count
      FROM rounds
      JOIN courses ON courses.id = rounds.course_id
      JOIN layouts ON layouts.id = rounds.layout_id
      LEFT JOIN round_players ON round_players.round_id = rounds.id
+     ${where}
      GROUP BY rounds.id
      ORDER BY rounds.created_at DESC`,
-  ).all<RoundListRow>();
+  )
+    .bind(...params)
+    .all<RoundListRow>();
 
   return c.json({
     rounds: results.map((row) => ({
       id: row.id,
       createdAt: row.created_at,
+      completedAt: row.completed_at,
       courseName: row.course_name,
       layoutName: row.layout_name,
       playerCount: row.player_count,
@@ -208,5 +244,28 @@ roundsRoute.get("/:roundId", async (c) => {
     return c.json({ error: "Round not found" }, 404);
   }
 
+  return c.json(detail);
+});
+
+roundsRoute.post("/:roundId/complete", async (c) => {
+  const roundId = Number(c.req.param("roundId"));
+  if (!Number.isInteger(roundId)) {
+    return c.json({ error: "Invalid round id" }, 400);
+  }
+
+  const round = await c.env.DB.prepare("SELECT id FROM rounds WHERE id = ?")
+    .bind(roundId)
+    .first();
+  if (!round) {
+    return c.json({ error: "Round not found" }, 404);
+  }
+
+  await c.env.DB.prepare(
+    "UPDATE rounds SET completed_at = datetime('now') WHERE id = ?",
+  )
+    .bind(roundId)
+    .run();
+
+  const detail = await buildRoundDetail(c.env.DB, roundId);
   return c.json(detail);
 });
