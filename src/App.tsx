@@ -14,6 +14,7 @@ import { CourseDetailPage } from "./courses/CourseDetailPage";
 import { NewRoundPage } from "./rounds/NewRoundPage";
 import { RoundPage } from "./rounds/RoundPage";
 import { RoundsListPage } from "./rounds/RoundsListPage";
+import { InstallPrompt } from "./app/InstallPrompt";
 import { UpdatePrompt } from "./app/UpdatePrompt";
 
 function NavBar() {
@@ -46,6 +47,7 @@ export function App() {
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <UpdatePrompt />
+      <InstallPrompt />
       <NavBar />
       <Routes>
         <Route path="/" element={<HomePage />} />
