@@ -1,25 +1,25 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { describe, expect, it } from "vitest";
 import { HomePage } from "./HomePage";
-import { localStore } from "../storage/localStore";
 
 describe("HomePage", () => {
-  beforeEach(async () => {
-    await localStore.clear();
-  });
+  it("renders the app name and navigation links", () => {
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
 
-  it("renders the hello world heading", () => {
-    render(<HomePage />);
     expect(
-      screen.getByRole("heading", { name: /hello, world!/i }),
+      screen.getByRole("heading", { name: /medisc/i }),
     ).toBeInTheDocument();
-  });
-
-  it("persists and displays a visit count via localforage", async () => {
-    render(<HomePage />);
-    await waitFor(() => {
-      expect(screen.getByText(/visit #1/i)).toBeInTheDocument();
-    });
-    await expect(localStore.getItem("visitCount")).resolves.toBe(1);
+    expect(
+      screen.getByRole("link", { name: /start a round/i }),
+    ).toHaveAttribute("href", "/rounds/new");
+    expect(screen.getByRole("link", { name: /courses/i })).toHaveAttribute(
+      "href",
+      "/courses",
+    );
   });
 });

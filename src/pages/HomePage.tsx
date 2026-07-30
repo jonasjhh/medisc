@@ -1,14 +1,11 @@
+import { Link as RouterLink } from "react-router-dom";
 import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
+import Button from "@mui/material/Button";
 import Container from "@mui/material/Container";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { ScoreBoard } from "../scores/ScoreBoard";
-import { useVisitCount } from "../storage/useVisitCount";
 
 export function HomePage() {
-  const visitCount = useVisitCount();
-
   return (
     <Container maxWidth="sm">
       <Box
@@ -24,27 +21,34 @@ export function HomePage() {
         }}
       >
         <Typography variant="h3" component="h1" fontWeight={600}>
-          Hello, world!
+          Medisc
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Medisc is up and running as an installable, offline-ready PWA.
+          Track your disc golf rounds, hole by hole.
         </Typography>
         <Stack
           direction="row"
-          spacing={1}
+          spacing={2}
           flexWrap="wrap"
           justifyContent="center"
         >
-          <Chip label="React" />
-          <Chip label="Material Design 3" />
-          <Chip label="PWA" />
+          <Button
+            variant="contained"
+            component={RouterLink}
+            to="/rounds/new"
+            size="large"
+          >
+            Start a round
+          </Button>
+          <Button
+            variant="outlined"
+            component={RouterLink}
+            to="/courses"
+            size="large"
+          >
+            Courses
+          </Button>
         </Stack>
-        {visitCount !== null && (
-          <Typography variant="body2" color="text.secondary">
-            Stored locally with localforage — visit #{visitCount}
-          </Typography>
-        )}
-        <ScoreBoard />
       </Box>
     </Container>
   );

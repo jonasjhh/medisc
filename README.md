@@ -12,15 +12,18 @@ The goal is a udisc-style scorecard without the bloat.
   on each one, so holes belong to a layout rather than directly to a course.
 - **Hole** — belongs to a layout: a number, a par, and an optional distance
   (meters).
-- Rounds, players, and hole-by-hole scoring (score + penalties per player
-  per hole) are the next phase, once course registration is in place.
+- **Player** — a lightweight reusable roster entry (just a name, no
+  login/account) picked from when starting a round.
+- **Round** — a group of players playing one layout together. Creating a
+  round pre-seeds a score (initialized to par, 0 penalties) for every
+  player × hole combination, so the scoring screen just adjusts numbers up
+  and down rather than creating rows on the fly.
 
 ## Stack
 
 - **React 18 + TypeScript**, built with **Vite**
 - **MUI (Material UI)** themed to Material Design 3 tokens
 - **vite-plugin-pwa** for the manifest + service worker (installable, offline)
-- **localforage** for local data persistence (IndexedDB-backed)
 - **react-router-dom** for client-side routing
 - **pnpm** as the package manager
 - **Cloudflare Workers + D1** for the backend API and database, routed with
@@ -78,16 +81,31 @@ D1 database bound as `DB` in `wrangler.toml`:
   `{ number, par, distanceMeters? }` → adds a hole to that layout. Rejects a
   duplicate hole `number` on the same layout with `409`.
 
-**Scores** (`worker/routes/scores.ts`) — the original visit-counter demo
-from the "Hello, world!" page, unrelated to disc golf scoring:
+**Players** (`worker/routes/players.ts`)
 
-- `POST /api/scores` — body `{ userId, score }`, inserts one row into the
-  `scores` table and returns `{ totalVisits, yourVisits }`.
-- `GET /api/scores/top?limit=10` — returns the leaderboard, scores summed
-  per `userId`.
+- `POST /api/players` — body `{ name }` → adds a player to the roster.
+- `GET /api/players` — lists all players.
 
-The course-registration frontend lives in `src/courses/`; visit it at
-`/courses` in the app.
+**Rounds** (`worker/routes/rounds.ts`)
+
+- `POST /api/rounds` — body `{ courseId, layoutId, playerIds }` → creates a
+  round, seeds a score (strokes = par, penalties = 0) for every player ×
+  hole, and returns the full round detail (course, layout, holes, players,
+  scores). 404s if the layout doesn't belong to the course, or if any
+  player id doesn't exist.
+- `GET /api/rounds` — lists rounds (course/layout name, player count),
+  newest first.
+- `GET /api/rounds/:roundId` — the same detail shape `POST` returns, for
+  resuming a round already in progress.
+
+**Hole scores** (`worker/routes/holeScores.ts`)
+
+- `PATCH /api/hole-scores/:id` — body `{ strokes?, penalties? }` → updates
+  one player's score for one hole. Either field alone is fine (the other is
+  left as-is); `strokes` can't go below 1, `penalties` not below 0.
+
+The frontend lives in `src/courses/` (`/courses`, `/courses/:courseId`) and
+`src/rounds/` (`/rounds`, `/rounds/new`, `/rounds/:roundId`).
 
 `wrangler.toml` also serves the built frontend (`dist/`) as static assets,
 so the Worker is the single deployable that hosts both the API and the app.

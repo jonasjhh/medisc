@@ -11,6 +11,9 @@ import Typography from "@mui/material/Typography";
 import { HomePage } from "./pages/HomePage";
 import { CoursesPage } from "./courses/CoursesPage";
 import { CourseDetailPage } from "./courses/CourseDetailPage";
+import { NewRoundPage } from "./rounds/NewRoundPage";
+import { RoundPage } from "./rounds/RoundPage";
+import { RoundsListPage } from "./rounds/RoundsListPage";
 import { UpdatePrompt } from "./app/UpdatePrompt";
 
 function NavBar() {
@@ -25,6 +28,9 @@ function NavBar() {
         >
           Medisc
         </Typography>
+        <Button color="inherit" component={RouterLink} to="/rounds">
+          Rounds
+        </Button>
         <Button color="inherit" component={RouterLink} to="/courses">
           Courses
         </Button>
@@ -45,6 +51,9 @@ export function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/courses" element={<CoursesPage />} />
         <Route path="/courses/:courseId" element={<CourseDetailPage />} />
+        <Route path="/rounds" element={<RoundsListPage />} />
+        <Route path="/rounds/new" element={<NewRoundPage />} />
+        <Route path="/rounds/:roundId" element={<RoundPage />} />
       </Routes>
     </BrowserRouter>
   );

@@ -6,7 +6,7 @@ describe("App", () => {
   it("renders the home route", () => {
     render(<App />);
     expect(
-      screen.getByRole("heading", { name: /hello, world!/i }),
+      screen.getByRole("heading", { name: /medisc/i }),
     ).toBeInTheDocument();
   });
 });
