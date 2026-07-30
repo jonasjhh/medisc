@@ -61,14 +61,14 @@ describe("courses api", () => {
       layoutId: 5,
       number: 1,
       par: 3,
-      distanceFeet: 275,
+      distanceMeters: 275,
     });
-    await createHole(5, { number: 1, par: 3, distanceFeet: 275 });
+    await createHole(5, { number: 1, par: 3, distanceMeters: 275 });
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/layouts/5/holes",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ number: 1, par: 3, distanceFeet: 275 }),
+        body: JSON.stringify({ number: 1, par: 3, distanceMeters: 275 }),
       }),
     );
   });

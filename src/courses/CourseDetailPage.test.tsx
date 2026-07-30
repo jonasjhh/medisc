@@ -16,7 +16,7 @@ const baseCourse: api.CourseDetail = {
       id: 10,
       name: "Blue",
       createdAt: "",
-      holes: [{ id: 100, number: 1, par: 3, distanceFeet: 275 }],
+      holes: [{ id: 100, number: 1, par: 3, distanceMeters: 275 }],
     },
   ],
 };
@@ -42,7 +42,7 @@ describe("CourseDetailPage", () => {
     expect(await screen.findByText("Maple Hill")).toBeInTheDocument();
     expect(screen.getByText("Blue")).toBeInTheDocument();
     expect(screen.getByText("Hole 1 — Par 3")).toBeInTheDocument();
-    expect(screen.getByText("275 ft")).toBeInTheDocument();
+    expect(screen.getByText("275 m")).toBeInTheDocument();
   });
 
   it("adds a layout and shows it once the course refreshes", async () => {
@@ -76,7 +76,7 @@ describe("CourseDetailPage", () => {
       layoutId: 10,
       number: 2,
       par: 4,
-      distanceFeet: null,
+      distanceMeters: null,
     });
     const user = userEvent.setup();
     renderPage();
@@ -89,7 +89,7 @@ describe("CourseDetailPage", () => {
     expect(api.createHole).toHaveBeenCalledWith(10, {
       number: 2,
       par: 4,
-      distanceFeet: null,
+      distanceMeters: null,
     });
   });
 

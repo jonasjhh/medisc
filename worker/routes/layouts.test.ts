@@ -20,7 +20,7 @@ interface HoleResponse {
   layoutId: number;
   number: number;
   par: number;
-  distanceFeet: number | null;
+  distanceMeters: number | null;
 }
 
 interface CourseDetailResponse extends CourseResponse {
@@ -31,7 +31,7 @@ interface CourseDetailResponse extends CourseResponse {
       id: number;
       number: number;
       par: number;
-      distanceFeet: number | null;
+      distanceMeters: number | null;
     }>;
   }>;
 }
@@ -80,7 +80,7 @@ describe("layouts API", () => {
       {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ number: 1, par: 3, distanceFeet: 275 }),
+        body: JSON.stringify({ number: 1, par: 3, distanceMeters: 275 }),
       },
       env,
     );
@@ -90,13 +90,13 @@ describe("layouts API", () => {
       layoutId: layout.id,
       number: 1,
       par: 3,
-      distanceFeet: 275,
+      distanceMeters: 275,
     });
 
     const detailRes = await app.request(`/api/courses/${course.id}`, {}, env);
     const detail = await json<CourseDetailResponse>(detailRes);
     expect(detail.layouts[0].holes).toEqual([
-      { id: hole.id, number: 1, par: 3, distanceFeet: 275 },
+      { id: hole.id, number: 1, par: 3, distanceMeters: 275 },
     ]);
   });
 
@@ -114,7 +114,7 @@ describe("layouts API", () => {
     );
     expect(holeRes.status).toBe(201);
     const hole = await json<HoleResponse>(holeRes);
-    expect(hole.distanceFeet).toBeNull();
+    expect(hole.distanceMeters).toBeNull();
   });
 
   it("rejects a duplicate hole number on the same layout", async () => {

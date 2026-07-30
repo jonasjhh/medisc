@@ -11,5 +11,5 @@ export const createLayoutSchema = z.object({
 export const createHoleSchema = z.object({
   number: z.number().int().min(1).max(200),
   par: z.number().int().min(1).max(20),
-  distanceFeet: z.number().int().min(1).max(5000).nullable().optional(),
+  distanceMeters: z.number().int().min(1).max(1500).nullable().optional(),
 });

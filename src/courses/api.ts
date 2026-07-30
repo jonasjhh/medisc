@@ -15,7 +15,7 @@ export interface Hole {
   id: number;
   number: number;
   par: number;
-  distanceFeet: number | null;
+  distanceMeters: number | null;
 }
 
 export interface NewHole extends Hole {
@@ -46,7 +46,7 @@ export interface CourseDetail {
 export interface NewHoleInput {
   number: number;
   par: number;
-  distanceFeet?: number | null;
+  distanceMeters?: number | null;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

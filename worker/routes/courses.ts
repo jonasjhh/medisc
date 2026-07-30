@@ -24,7 +24,7 @@ interface HoleRow {
   layout_id: number;
   number: number;
   par: number;
-  distance_feet: number | null;
+  distance_meters: number | null;
 }
 
 export const coursesRoute = new Hono<{ Bindings: Env }>();
@@ -96,7 +96,7 @@ coursesRoute.get("/:courseId", async (c) => {
   if (layoutIds.length > 0) {
     const placeholders = layoutIds.map(() => "?").join(",");
     const { results: holeRows } = await c.env.DB.prepare(
-      `SELECT id, layout_id, number, par, distance_feet
+      `SELECT id, layout_id, number, par, distance_meters
        FROM holes
        WHERE layout_id IN (${placeholders})
        ORDER BY number`,
@@ -123,7 +123,7 @@ coursesRoute.get("/:courseId", async (c) => {
         id: hole.id,
         number: hole.number,
         par: hole.par,
-        distanceFeet: hole.distance_feet,
+        distanceMeters: hole.distance_meters,
       })),
     })),
   });

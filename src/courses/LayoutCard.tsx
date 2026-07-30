@@ -31,7 +31,7 @@ export function LayoutCard({
       await createHole(layout.id, {
         number: Number(number),
         par: Number(par),
-        distanceFeet: distance ? Number(distance) : null,
+        distanceMeters: distance ? Number(distance) : null,
       });
       setNumber("");
       setPar("");
@@ -57,7 +57,7 @@ export function LayoutCard({
               <ListItemText
                 primary={`Hole ${hole.number} — Par ${hole.par}`}
                 secondary={
-                  hole.distanceFeet ? `${hole.distanceFeet} ft` : undefined
+                  hole.distanceMeters ? `${hole.distanceMeters} m` : undefined
                 }
               />
             </ListItem>
@@ -93,7 +93,7 @@ export function LayoutCard({
           required
         />
         <TextField
-          label="Distance (ft)"
+          label="Distance (m)"
           type="number"
           size="small"
           value={distance}

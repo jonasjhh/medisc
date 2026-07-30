@@ -11,7 +11,7 @@ The goal is a udisc-style scorecard without the bloat.
   "Championship"); the same physical hole can have a different par/distance
   on each one, so holes belong to a layout rather than directly to a course.
 - **Hole** — belongs to a layout: a number, a par, and an optional distance
-  (feet).
+  (meters).
 - Rounds, players, and hole-by-hole scoring (score + penalties per player
   per hole) are the next phase, once course registration is in place.
 
@@ -75,7 +75,7 @@ D1 database bound as `DB` in `wrangler.toml`:
 **Layouts** (`worker/routes/layouts.ts`)
 
 - `POST /api/layouts/:layoutId/holes` — body
-  `{ number, par, distanceFeet? }` → adds a hole to that layout. Rejects a
+  `{ number, par, distanceMeters? }` → adds a hole to that layout. Rejects a
   duplicate hole `number` on the same layout with `409`.
 
 **Scores** (`worker/routes/scores.ts`) — the original visit-counter demo

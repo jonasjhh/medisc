@@ -7,7 +7,7 @@ interface HoleRow {
   layout_id: number;
   number: number;
   par: number;
-  distance_feet: number | null;
+  distance_meters: number | null;
 }
 
 export const layoutsRoute = new Hono<{ Bindings: Env }>();
@@ -31,7 +31,7 @@ layoutsRoute.post("/:layoutId/holes", async (c) => {
     return c.json({ error: "Layout not found" }, 404);
   }
 
-  const { number, par, distanceFeet } = parsed.data;
+  const { number, par, distanceMeters } = parsed.data;
 
   const existing = await c.env.DB.prepare(
     "SELECT id FROM holes WHERE layout_id = ? AND number = ?",
@@ -46,11 +46,11 @@ layoutsRoute.post("/:layoutId/holes", async (c) => {
   }
 
   const row = await c.env.DB.prepare(
-    `INSERT INTO holes (layout_id, number, par, distance_feet)
+    `INSERT INTO holes (layout_id, number, par, distance_meters)
      VALUES (?, ?, ?, ?)
-     RETURNING id, layout_id, number, par, distance_feet`,
+     RETURNING id, layout_id, number, par, distance_meters`,
   )
-    .bind(layoutId, number, par, distanceFeet ?? null)
+    .bind(layoutId, number, par, distanceMeters ?? null)
     .first<HoleRow>();
 
   return c.json(
@@ -59,7 +59,7 @@ layoutsRoute.post("/:layoutId/holes", async (c) => {
       layoutId: row!.layout_id,
       number: row!.number,
       par: row!.par,
-      distanceFeet: row!.distance_feet,
+      distanceMeters: row!.distance_meters,
     },
     201,
   );
