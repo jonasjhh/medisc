@@ -86,7 +86,7 @@ D1 database bound as `DB` in `wrangler.toml`:
 - `POST /api/players` — body `{ name }` → adds a player to the roster.
 - `GET /api/players` — lists all players.
 - `GET /api/players/:playerId/layouts` — distinct course/layout combos the
-  player has *completed* rounds on, for populating a stats filter. 404s if
+  player has _completed_ rounds on, for populating a stats filter. 404s if
   the player doesn't exist.
 - `GET /api/players/:playerId/stats?layoutId=` — per-hole aggregates
   (times played, avg/best/worst strokes, avg penalties) across the

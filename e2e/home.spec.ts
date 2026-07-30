@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-test("home page shows the hello world greeting", async ({ page }) => {
+test("home page shows the app name and a way to start a round", async ({
+  page,
+}) => {
   await page.goto("/");
-  await expect(
-    page.getByRole("heading", { name: "Hello, world!" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Medisc" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Start a round" })).toBeVisible();
 });
 
 test("app is installable as a PWA (manifest + service worker registered)", async ({
