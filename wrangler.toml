@@ -14,6 +14,5 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "medisc"
-# Replace with the id printed by `wrangler d1 create medisc`.
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "8983a11f-6687-4221-8451-2176ec4a79be"
 migrations_dir = "migrations"
