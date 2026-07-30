@@ -23,6 +23,11 @@ import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
@@ -39,6 +44,21 @@ import {
 } from "./api";
 import type { RoundDetail, RoundPlayer } from "./api";
 import { ScoreAdjuster } from "./ScoreAdjuster";
+import { scoreOutcome } from "./scoreColor";
+
+const outcomeButtonColor = {
+  birdie: "success",
+  par: "standard",
+  bogey: "warning",
+} as const;
+
+function relativeToPar(total: number, par: number): string {
+  const diff = total - par;
+  if (diff === 0) {
+    return "E";
+  }
+  return diff > 0 ? `+${diff}` : `${diff}`;
+}
 
 type Status = "loading" | "ready" | "error";
 type Field = "strokes" | "penalties";
@@ -263,12 +283,14 @@ export function RoundPage() {
     );
   }
 
-  const hole = round.holes[holeIndex];
+  const isSummary = holeIndex === round.holes.length;
+  const hole = round.holes[isSummary ? 0 : holeIndex];
   const isFirstHole = holeIndex === 0;
-  const isLastHole = holeIndex === round.holes.length - 1;
+  const isLastHole = isSummary;
   const isCompleted = round.completedAt !== null;
   const birdieValue = Math.max(1, hole.par - 1);
   const bogeyValue = hole.par + 1;
+  const coursePar = round.holes.reduce((sum, h) => sum + h.par, 0);
   const playersNotInRound = allPlayers.filter(
     (player) =>
       !round.players.some((roundPlayer) => roundPlayer.id === player.id),
@@ -445,17 +467,26 @@ export function RoundPage() {
         >
           <ArrowBackIcon />
         </IconButton>
-        <Box textAlign="center">
-          <Typography variant="h4">Hole {hole.number}</Typography>
-          <Typography color="text.secondary">
-            Par {hole.par}
-            {hole.distanceMeters ? ` · ${hole.distanceMeters} m` : ""}
-          </Typography>
-        </Box>
+        {isSummary ? (
+          <Box textAlign="center">
+            <Typography variant="h4">Summary</Typography>
+            <Typography color="text.secondary">
+              Course par {coursePar}
+            </Typography>
+          </Box>
+        ) : (
+          <Box textAlign="center">
+            <Typography variant="h4">Hole {hole.number}</Typography>
+            <Typography color="text.secondary">
+              Par {hole.par}
+              {hole.distanceMeters ? ` · ${hole.distanceMeters} m` : ""}
+            </Typography>
+          </Box>
+        )}
         <IconButton
           aria-label="next hole"
           onClick={() =>
-            setHoleIndex((index) => Math.min(round.holes.length - 1, index + 1))
+            setHoleIndex((index) => Math.min(round.holes.length, index + 1))
           }
           disabled={isLastHole}
         >
@@ -463,63 +494,161 @@ export function RoundPage() {
         </IconButton>
       </Stack>
 
-      <Stack spacing={2}>
-        {round.players.map((player) => {
-          const score = round.scores.find(
-            (candidate) =>
-              candidate.holeId === hole.id && candidate.playerId === player.id,
-          );
-          if (!score) {
-            return null;
-          }
-          return (
-            <Paper key={player.id} variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                {player.name}
-              </Typography>
-
-              {!isCompleted && (
-                <ToggleButtonGroup
-                  exclusive
-                  size="small"
-                  fullWidth
-                  value={score.strokes}
-                  onChange={(_event, value: number | null) => {
-                    if (value !== null) {
-                      void setScore(score.id, "strokes", value);
+      {isSummary ? (
+        <Box sx={{ overflowX: "auto" }}>
+          <Table
+            size="small"
+            aria-label="Scorecard summary"
+            sx={{
+              "& td, & th": { px: 0.75, py: 0.5, fontSize: "0.8125rem" },
+            }}
+          >
+            <TableHead>
+              <TableRow>
+                <TableCell>Hole</TableCell>
+                <TableCell align="right">Par</TableCell>
+                {round.players.map((player) => (
+                  <TableCell key={player.id} align="right">
+                    {player.name}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {round.holes.map((roundHole) => (
+                <TableRow key={roundHole.id}>
+                  <TableCell>{roundHole.number}</TableCell>
+                  <TableCell align="right">{roundHole.par}</TableCell>
+                  {round.players.map((player) => {
+                    const score = round.scores.find(
+                      (candidate) =>
+                        candidate.holeId === roundHole.id &&
+                        candidate.playerId === player.id,
+                    );
+                    if (!score) {
+                      return <TableCell key={player.id} align="right" />;
                     }
-                  }}
-                  aria-label={`${player.name} quick score`}
-                  sx={{ mb: 1.5 }}
-                >
-                  <ToggleButton value={birdieValue}>Birdie</ToggleButton>
-                  <ToggleButton value={hole.par}>Par</ToggleButton>
-                  <ToggleButton value={bogeyValue}>Bogey</ToggleButton>
-                </ToggleButtonGroup>
-              )}
+                    const outcome = scoreOutcome(score.strokes, roundHole.par);
+                    return (
+                      <TableCell
+                        key={player.id}
+                        align="right"
+                        sx={{
+                          color:
+                            outcome === "par"
+                              ? undefined
+                              : `${outcome === "birdie" ? "success" : "warning"}.main`,
+                          fontWeight: outcome === "par" ? undefined : 700,
+                        }}
+                      >
+                        {score.strokes}
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              ))}
+              <TableRow>
+                <TableCell component="th" scope="row" sx={{ fontWeight: 700 }}>
+                  Total
+                </TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700 }}>
+                  {coursePar}
+                </TableCell>
+                {round.players.map((player) => {
+                  const total = round.scores
+                    .filter((score) => score.playerId === player.id)
+                    .reduce((sum, score) => sum + score.strokes, 0);
+                  return (
+                    <TableCell
+                      key={player.id}
+                      align="right"
+                      sx={{ fontWeight: 700 }}
+                    >
+                      {total} ({relativeToPar(total, coursePar)})
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            </TableBody>
+          </Table>
+        </Box>
+      ) : (
+        <Stack spacing={1.5}>
+          {round.players.map((player) => {
+            const score = round.scores.find(
+              (candidate) =>
+                candidate.holeId === hole.id &&
+                candidate.playerId === player.id,
+            );
+            if (!score) {
+              return null;
+            }
+            const outcome = scoreOutcome(score.strokes, hole.par);
+            return (
+              <Paper key={player.id} variant="outlined" sx={{ p: 1.5 }}>
+                <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                  {player.name}
+                </Typography>
 
-              <Stack direction="row" spacing={4}>
-                <ScoreAdjuster
-                  label="Strokes"
-                  value={score.strokes}
-                  min={1}
-                  readOnly={isCompleted}
-                  onDecrement={() => void adjust(score.id, "strokes", -1)}
-                  onIncrement={() => void adjust(score.id, "strokes", 1)}
-                />
-                <ScoreAdjuster
-                  label="Penalties"
-                  value={score.penalties}
-                  min={0}
-                  readOnly={isCompleted}
-                  onDecrement={() => void adjust(score.id, "penalties", -1)}
-                  onIncrement={() => void adjust(score.id, "penalties", 1)}
-                />
-              </Stack>
-            </Paper>
-          );
-        })}
-      </Stack>
+                {!isCompleted && (
+                  <ToggleButtonGroup
+                    exclusive
+                    size="small"
+                    fullWidth
+                    value={score.strokes}
+                    onChange={(_event, value: number | null) => {
+                      if (value !== null) {
+                        void setScore(score.id, "strokes", value);
+                      }
+                    }}
+                    aria-label={`${player.name} quick score`}
+                    sx={{ mb: 1 }}
+                  >
+                    <ToggleButton
+                      value={birdieValue}
+                      color={outcomeButtonColor.birdie}
+                    >
+                      Birdie
+                    </ToggleButton>
+                    <ToggleButton
+                      value={hole.par}
+                      color={outcomeButtonColor.par}
+                    >
+                      Par
+                    </ToggleButton>
+                    <ToggleButton
+                      value={bogeyValue}
+                      color={outcomeButtonColor.bogey}
+                    >
+                      Bogey
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                )}
+
+                <Stack direction="row" spacing={4}>
+                  <ScoreAdjuster
+                    label="Strokes"
+                    value={score.strokes}
+                    min={1}
+                    readOnly={isCompleted}
+                    outcome={outcome}
+                    onDecrement={() => void adjust(score.id, "strokes", -1)}
+                    onIncrement={() => void adjust(score.id, "strokes", 1)}
+                  />
+                  <ScoreAdjuster
+                    label="Penalties"
+                    value={score.penalties}
+                    min={0}
+                    readOnly={isCompleted}
+                    onDecrement={() => void adjust(score.id, "penalties", -1)}
+                    onIncrement={() => void adjust(score.id, "penalties", 1)}
+                  />
+                </Stack>
+              </Paper>
+            );
+          })}
+        </Stack>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ mt: 2 }}>

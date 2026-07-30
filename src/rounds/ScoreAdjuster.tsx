@@ -3,6 +3,13 @@ import RemoveIcon from "@mui/icons-material/Remove";
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import Typography from "@mui/material/Typography";
+import type { ScoreOutcome } from "./scoreColor";
+
+const outcomeColor: Record<ScoreOutcome, string | undefined> = {
+  birdie: "success.main",
+  par: undefined,
+  bogey: "warning.main",
+};
 
 export function ScoreAdjuster({
   label,
@@ -11,6 +18,7 @@ export function ScoreAdjuster({
   onDecrement,
   onIncrement,
   readOnly = false,
+  outcome,
 }: {
   label: string;
   value: number;
@@ -18,6 +26,7 @@ export function ScoreAdjuster({
   onDecrement: () => void;
   onIncrement: () => void;
   readOnly?: boolean;
+  outcome?: ScoreOutcome;
 }) {
   return (
     <Box textAlign="center">
@@ -35,7 +44,12 @@ export function ScoreAdjuster({
             <RemoveIcon fontSize="small" />
           </IconButton>
         )}
-        <Typography variant="h5" sx={{ minWidth: 32, textAlign: "center" }}>
+        <Typography
+          variant="h5"
+          sx={{ minWidth: 32, textAlign: "center" }}
+          color={outcome ? outcomeColor[outcome] : undefined}
+          fontWeight={outcome && outcome !== "par" ? 700 : undefined}
+        >
           {value}
         </Typography>
         {!readOnly && (

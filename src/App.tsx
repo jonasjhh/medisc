@@ -1,12 +1,21 @@
+import { useState } from "react";
 import {
   BrowserRouter,
   Link as RouterLink,
   Route,
   Routes,
 } from "react-router-dom";
+import BrightnessAutoIcon from "@mui/icons-material/BrightnessAuto";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
+import LightModeIcon from "@mui/icons-material/LightMode";
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import IconButton from "@mui/material/IconButton";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
@@ -20,6 +29,70 @@ import { PlayersListPage } from "./players/PlayersListPage";
 import { PlayerStatsPage } from "./players/PlayerStatsPage";
 import { InstallPrompt } from "./app/InstallPrompt";
 import { UpdatePrompt } from "./app/UpdatePrompt";
+import { useThemeMode } from "./app/ThemeModeContext";
+import type { ThemeModePreference } from "./app/ThemeModeContext";
+
+const modeIcons: Record<ThemeModePreference, typeof LightModeIcon> = {
+  light: LightModeIcon,
+  dark: DarkModeIcon,
+  system: BrightnessAutoIcon,
+};
+
+function ThemeModeMenu() {
+  const { preference, setPreference } = useThemeMode();
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const CurrentIcon = modeIcons[preference];
+
+  const choose = (next: ThemeModePreference) => {
+    setPreference(next);
+    setAnchorEl(null);
+  };
+
+  return (
+    <>
+      <IconButton
+        color="inherit"
+        aria-label="theme mode"
+        onClick={(event) => setAnchorEl(event.currentTarget)}
+      >
+        <CurrentIcon fontSize="small" />
+      </IconButton>
+      <Menu
+        anchorEl={anchorEl}
+        open={anchorEl !== null}
+        onClose={() => setAnchorEl(null)}
+      >
+        <MenuItem
+          selected={preference === "light"}
+          onClick={() => choose("light")}
+        >
+          <ListItemIcon>
+            <LightModeIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Light</ListItemText>
+        </MenuItem>
+        <MenuItem
+          selected={preference === "dark"}
+          onClick={() => choose("dark")}
+        >
+          <ListItemIcon>
+            <DarkModeIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Dark</ListItemText>
+        </MenuItem>
+        <MenuItem
+          selected={preference === "system"}
+          onClick={() => choose("system")}
+        >
+          <ListItemIcon>
+            <BrightnessAutoIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>System</ListItemText>
+        </MenuItem>
+      </Menu>
+    </>
+  );
+}
 
 function NavBar() {
   return (
@@ -44,6 +117,7 @@ function NavBar() {
             Players
           </Button>
         </Stack>
+        <ThemeModeMenu />
       </Toolbar>
     </AppBar>
   );

@@ -70,7 +70,7 @@ describe("RoundPage", () => {
     expect(screen.getByText(/par 4/i)).toBeInTheDocument();
   });
 
-  it("disables previous on the first hole and next on the last", async () => {
+  it("disables previous on the first hole and next on the final summary step", async () => {
     const user = userEvent.setup();
     renderPage();
 
@@ -81,6 +81,10 @@ describe("RoundPage", () => {
 
     await user.click(screen.getByRole("button", { name: /next hole/i }));
     await screen.findByText("Hole 2");
+    expect(screen.getByRole("button", { name: /next hole/i })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: /next hole/i }));
+    await screen.findByText("Summary");
     expect(screen.getByRole("button", { name: /next hole/i })).toBeDisabled();
   });
 
@@ -344,5 +348,35 @@ describe("RoundPage", () => {
     expect(
       screen.queryByRole("button", { name: /swap alice/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("reaches the scorecard summary after the last hole and shows totals", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: /next hole/i }));
+    await screen.findByText("Hole 2");
+    expect(screen.getByRole("button", { name: /next hole/i })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: /next hole/i }));
+
+    expect(await screen.findByText("Summary")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /next hole/i })).toBeDisabled();
+    // Alice: 3 + 4 = 7 strokes against a course par of 7 (3 + 4) → even.
+    expect(screen.getByText("7 (E)")).toBeInTheDocument();
+  });
+
+  it("navigates back from the summary to the last hole", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: /next hole/i }));
+    await user.click(screen.getByRole("button", { name: /next hole/i }));
+    await screen.findByText("Summary");
+
+    await user.click(screen.getByRole("button", { name: /previous hole/i }));
+
+    expect(await screen.findByText("Hole 2")).toBeInTheDocument();
   });
 });
