@@ -1,5 +1,4 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CourseDetailPage } from "./CourseDetailPage";
@@ -45,52 +44,12 @@ describe("CourseDetailPage", () => {
     expect(screen.getByText("275 m")).toBeInTheDocument();
   });
 
-  it("adds a layout and shows it once the course refreshes", async () => {
-    vi.mocked(api.createLayout).mockResolvedValue({
-      id: 11,
-      courseId: 1,
-      name: "Red",
-      createdAt: "",
-    });
-    vi.mocked(api.getCourse).mockResolvedValue({
-      ...baseCourse,
-      layouts: [
-        ...baseCourse.layouts,
-        { id: 11, name: "Red", createdAt: "", holes: [] },
-      ],
-    });
-    const user = userEvent.setup();
+  it("shows an empty state when a course has no layouts", async () => {
+    vi.mocked(api.getCourse).mockResolvedValue({ ...baseCourse, layouts: [] });
     renderPage();
 
-    await screen.findByText("Maple Hill");
-    await user.type(screen.getByLabelText(/layout name/i), "Red");
-    await user.click(screen.getByRole("button", { name: "Add" }));
-
-    expect(api.createLayout).toHaveBeenCalledWith(1, "Red");
-    expect(await screen.findByText("Red")).toBeInTheDocument();
-  });
-
-  it("adds a hole to a layout", async () => {
-    vi.mocked(api.createHole).mockResolvedValue({
-      id: 101,
-      layoutId: 10,
-      number: 2,
-      par: 4,
-      distanceMeters: null,
-    });
-    const user = userEvent.setup();
-    renderPage();
-
-    await screen.findByText("Maple Hill");
-    await user.type(screen.getByLabelText(/hole #/i), "2");
-    await user.type(screen.getByLabelText(/^par/i), "4");
-    await user.click(screen.getByRole("button", { name: /add hole/i }));
-
-    expect(api.createHole).toHaveBeenCalledWith(10, {
-      number: 2,
-      par: 4,
-      distanceMeters: null,
-    });
+    expect(await screen.findByText("Maple Hill")).toBeInTheDocument();
+    expect(screen.getByText(/no layouts yet/i)).toBeInTheDocument();
   });
 
   it("shows an error state when the course fails to load", async () => {

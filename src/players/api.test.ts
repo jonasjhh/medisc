@@ -4,6 +4,7 @@ import {
   getPlayerLayouts,
   getPlayerStats,
   listPlayers,
+  updatePlayer,
 } from "./api";
 
 function mockFetchOnce(body: unknown, init: { ok?: boolean } = {}) {
@@ -25,6 +26,18 @@ describe("players api", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ name: "Alice" }),
+      }),
+    );
+  });
+
+  it("renames a player", async () => {
+    const fetchMock = mockFetchOnce({ id: 1, name: "Jon", createdAt: "" });
+    await updatePlayer(1, "Jon");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/players/1",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ name: "Jon" }),
       }),
     );
   });

@@ -1,12 +1,17 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PlayersListPage } from "./PlayersListPage";
 import * as playersApi from "./api";
 
 vi.mock("./api");
 
 describe("PlayersListPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("lists existing players", async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
       players: [{ id: 1, name: "Alice", createdAt: "" }],
@@ -18,6 +23,55 @@ describe("PlayersListPage", () => {
       </MemoryRouter>,
     );
 
+    expect(await screen.findByText("Alice")).toBeInTheDocument();
+  });
+
+  it("renames a player", async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [{ id: 1, name: "Alice", createdAt: "" }],
+    });
+    vi.mocked(playersApi.updatePlayer).mockResolvedValue({
+      id: 1,
+      name: "Ally",
+      createdAt: "",
+    });
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <PlayersListPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Alice");
+    await user.click(screen.getByRole("button", { name: /edit alice/i }));
+
+    const input = screen.getByLabelText("Name");
+    await user.clear(input);
+    await user.type(input, "Ally");
+    await user.click(screen.getByRole("button", { name: /save name/i }));
+
+    expect(playersApi.updatePlayer).toHaveBeenCalledWith(1, "Ally");
+    expect(await screen.findByText("Ally")).toBeInTheDocument();
+  });
+
+  it("cancels an edit without saving", async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [{ id: 1, name: "Alice", createdAt: "" }],
+    });
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <PlayersListPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Alice");
+    await user.click(screen.getByRole("button", { name: /edit alice/i }));
+    await user.click(screen.getByRole("button", { name: /cancel edit/i }));
+
+    expect(playersApi.updatePlayer).not.toHaveBeenCalled();
     expect(await screen.findByText("Alice")).toBeInTheDocument();
   });
 

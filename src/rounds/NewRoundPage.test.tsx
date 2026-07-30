@@ -60,6 +60,7 @@ describe("NewRoundPage", () => {
       id: 5,
       createdAt: "",
       completedAt: null,
+      counting: true,
       course: { id: 1, name: "Maple Hill" },
       layout: { id: 10, name: "Blue" },
       holes: [],

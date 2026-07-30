@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import type { Env } from "../types";
-import { createCourseSchema, createLayoutSchema } from "../schemas";
 
 interface CourseRow {
   id: number;
@@ -28,25 +27,6 @@ interface HoleRow {
 }
 
 export const coursesRoute = new Hono<{ Bindings: Env }>();
-
-coursesRoute.post("/", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = createCourseSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: parsed.error.flatten() }, 400);
-  }
-
-  const row = await c.env.DB.prepare(
-    "INSERT INTO courses (name) VALUES (?) RETURNING id, name, created_at",
-  )
-    .bind(parsed.data.name)
-    .first<CourseRow>();
-
-  return c.json(
-    { id: row!.id, name: row!.name, createdAt: row!.created_at },
-    201,
-  );
-});
 
 coursesRoute.get("/", async (c) => {
   const { results } = await c.env.DB.prepare(
@@ -127,40 +107,4 @@ coursesRoute.get("/:courseId", async (c) => {
       })),
     })),
   });
-});
-
-coursesRoute.post("/:courseId/layouts", async (c) => {
-  const courseId = Number(c.req.param("courseId"));
-  if (!Number.isInteger(courseId)) {
-    return c.json({ error: "Invalid course id" }, 400);
-  }
-
-  const body = await c.req.json().catch(() => null);
-  const parsed = createLayoutSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: parsed.error.flatten() }, 400);
-  }
-
-  const course = await c.env.DB.prepare("SELECT id FROM courses WHERE id = ?")
-    .bind(courseId)
-    .first();
-  if (!course) {
-    return c.json({ error: "Course not found" }, 404);
-  }
-
-  const row = await c.env.DB.prepare(
-    "INSERT INTO layouts (course_id, name) VALUES (?, ?) RETURNING id, course_id, name, created_at",
-  )
-    .bind(courseId, parsed.data.name)
-    .first<LayoutRow>();
-
-  return c.json(
-    {
-      id: row!.id,
-      courseId: row!.course_id,
-      name: row!.name,
-      createdAt: row!.created_at,
-    },
-    201,
-  );
 });

@@ -3,14 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RoundPage } from "./RoundPage";
+import * as playersApi from "../players/api";
 import * as roundsApi from "./api";
 
+vi.mock("../players/api");
 vi.mock("./api");
 
 const baseRound: roundsApi.RoundDetail = {
   id: 1,
   createdAt: "",
   completedAt: null,
+  counting: true,
   course: { id: 1, name: "Maple Hill" },
   layout: { id: 10, name: "Blue" },
   holes: [
@@ -37,6 +40,12 @@ function renderPage() {
 describe("RoundPage", () => {
   beforeEach(() => {
     vi.mocked(roundsApi.getRound).mockResolvedValue(baseRound);
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [
+        { id: 1, name: "Alice", createdAt: "" },
+        { id: 2, name: "Bob", createdAt: "" },
+      ],
+    });
   });
 
   it("shows the first hole and current player scores", async () => {
@@ -44,7 +53,7 @@ describe("RoundPage", () => {
 
     expect(await screen.findByText("Hole 1")).toBeInTheDocument();
     expect(screen.getByText(/par 3/i)).toBeInTheDocument();
-    expect(screen.getByText("Alice")).toBeInTheDocument();
+    expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);
     expect(screen.getByText("3")).toBeInTheDocument();
   });
 
@@ -140,6 +149,68 @@ describe("RoundPage", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /increase strokes/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("toggles the counting flag", async () => {
+    vi.mocked(roundsApi.updateRound).mockResolvedValue({
+      ...baseRound,
+      counting: false,
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    const toggle = screen.getByRole("checkbox", { name: /counting round/i });
+    expect(toggle).toBeChecked();
+
+    await user.click(toggle);
+
+    expect(roundsApi.updateRound).toHaveBeenCalledWith(1, {
+      counting: false,
+    });
+    expect(
+      await screen.findByRole("checkbox", { name: /counting round/i }),
+    ).not.toBeChecked();
+  });
+
+  it("swaps which players are in the round", async () => {
+    vi.mocked(roundsApi.updateRound).mockResolvedValue({
+      ...baseRound,
+      players: [{ id: 2, name: "Bob" }],
+      scores: [
+        { id: 2000, holeId: 100, playerId: 2, strokes: 3, penalties: 0 },
+        { id: 2001, holeId: 101, playerId: 2, strokes: 4, penalties: 0 },
+      ],
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: /manage players/i }));
+
+    await user.click(await screen.findByLabelText("Bob"));
+    await user.click(screen.getByLabelText("Alice"));
+    await user.click(screen.getByRole("button", { name: /save players/i }));
+
+    expect(roundsApi.updateRound).toHaveBeenCalledWith(1, {
+      playerIds: [2],
+    });
+    await screen.findByRole("button", { name: /manage players/i });
+    expect(screen.getAllByText("Bob").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Alice")).not.toBeInTheDocument();
+  });
+
+  it("does not offer to manage players on a completed round", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+    });
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    expect(
+      screen.queryByRole("button", { name: /manage players/i }),
     ).not.toBeInTheDocument();
   });
 });

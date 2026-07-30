@@ -1,6 +1,7 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import app from "../index";
+import { seedCourse } from "../test/seed";
 
 async function json<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
@@ -10,32 +11,15 @@ async function request(path: string, init?: RequestInit): Promise<Response> {
   return app.request(path, init, env);
 }
 
-async function setUpCourseWithTwoHoles() {
-  const course = await json<{ id: number }>(
-    await request("/api/courses", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Maple Hill" }),
-    }),
-  );
-  const layout = await json<{ id: number }>(
-    await request(`/api/courses/${course.id}/layouts`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Blue" }),
-    }),
-  );
-  await request(`/api/layouts/${layout.id}/holes`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ number: 1, par: 3, distanceMeters: 90 }),
+function setUpCourseWithTwoHoles() {
+  return seedCourse(env, {
+    courseName: "Maple Hill",
+    layoutName: "Blue",
+    holes: [
+      { number: 1, par: 3, distanceMeters: 90 },
+      { number: 2, par: 4, distanceMeters: 120 },
+    ],
   });
-  await request(`/api/layouts/${layout.id}/holes`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ number: 2, par: 4, distanceMeters: 120 }),
-  });
-  return { courseId: course.id, layoutId: layout.id };
 }
 
 async function createPlayer(name: string) {
@@ -76,9 +60,9 @@ describe("rounds API", () => {
     });
     expect(res.status).toBe(201);
     const round = await json<{
-      id: number;
       course: { name: string };
       layout: { name: string };
+      counting: boolean;
       holes: Array<{ id: number; number: number; par: number }>;
       players: Array<{ id: number; name: string }>;
       scores: Array<{
@@ -91,6 +75,7 @@ describe("rounds API", () => {
 
     expect(round.course.name).toBe("Maple Hill");
     expect(round.layout.name).toBe("Blue");
+    expect(round.counting).toBe(true);
     expect(round.holes).toHaveLength(2);
     expect(round.players.map((p) => p.name).sort()).toEqual(["Alice", "Bob"]);
     expect(round.scores).toHaveLength(4); // 2 players x 2 holes
@@ -104,20 +89,17 @@ describe("rounds API", () => {
 
   it("404s when the layout doesn't belong to the course", async () => {
     const { layoutId } = await setUpCourseWithTwoHoles();
-    const otherCourse = await json<{ id: number }>(
-      await request("/api/courses", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Other Course" }),
-      }),
-    );
+    const { courseId: otherCourseId } = await seedCourse(env, {
+      courseName: "Other Course",
+      holes: [],
+    });
     const alice = await createPlayer("Alice");
 
     const res = await request("/api/rounds", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        courseId: otherCourse.id,
+        courseId: otherCourseId,
         layoutId,
         playerIds: [alice.id],
       }),
@@ -188,13 +170,10 @@ describe("rounds API", () => {
 
   it("filters the rounds list by status, player, and course", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
-    const otherCourse = await json<{ id: number }>(
-      await request("/api/courses", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Other Course" }),
-      }),
-    );
+    const { courseId: otherCourseId } = await seedCourse(env, {
+      courseName: "Other Course",
+      holes: [],
+    });
     const alice = await createPlayer("Alice");
     const bob = await createPlayer("Bob");
 
@@ -229,8 +208,108 @@ describe("rounds API", () => {
     expect(aliceRes.rounds).toHaveLength(1);
 
     const otherCourseRes = await json<{ rounds: unknown[] }>(
-      await request(`/api/rounds?courseId=${otherCourse.id}`),
+      await request(`/api/rounds?courseId=${otherCourseId}`),
     );
     expect(otherCourseRes.rounds).toHaveLength(0);
+  });
+
+  it("swaps which players are in an in-progress round", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const bob = await createPlayer("Bob");
+    const round = await json<{ id: number }>(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+    );
+
+    const res = await request(`/api/rounds/${round.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ playerIds: [bob.id] }),
+    });
+    expect(res.status).toBe(200);
+    const updated = await json<{
+      players: Array<{ id: number; name: string }>;
+      scores: Array<{ playerId: number }>;
+    }>(res);
+    expect(updated.players).toEqual([{ id: bob.id, name: "Bob" }]);
+    expect(updated.scores.every((score) => score.playerId === bob.id)).toBe(
+      true,
+    );
+    expect(updated.scores).toHaveLength(2); // 2 holes x 1 player
+  });
+
+  it("409s when swapping players on a completed round", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const bob = await createPlayer("Bob");
+    const round = await json<{ id: number }>(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+    );
+    await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
+
+    const res = await request(`/api/rounds/${round.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ playerIds: [bob.id] }),
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("toggles the counting flag, even on a completed round", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const round = await json<{ id: number }>(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+    );
+    await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
+
+    const res = await request(`/api/rounds/${round.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ counting: false }),
+    });
+    expect(res.status).toBe(200);
+    const updated = await json<{ counting: boolean }>(res);
+    expect(updated.counting).toBe(false);
+  });
+
+  it("404s when swapping players on a round that doesn't exist", async () => {
+    const res = await request("/api/rounds/999", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ counting: false }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects a PATCH body with neither field", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const round = await json<{ id: number }>(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+    );
+
+    const res = await request(`/api/rounds/${round.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
   });
 });

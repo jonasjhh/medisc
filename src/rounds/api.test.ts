@@ -5,6 +5,7 @@ import {
   getRound,
   listRounds,
   updateHoleScore,
+  updateRound,
 } from "./api";
 
 function mockFetchOnce(body: unknown, init: { ok?: boolean } = {}) {
@@ -82,6 +83,23 @@ describe("rounds api", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/rounds/1/complete",
       expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("updates a round's players and counting flag", async () => {
+    const fetchMock = mockFetchOnce({
+      id: 1,
+      holes: [],
+      players: [],
+      scores: [],
+    });
+    await updateRound(1, { playerIds: [2, 3], counting: false });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rounds/1",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ playerIds: [2, 3], counting: false }),
+      }),
     );
   });
 });

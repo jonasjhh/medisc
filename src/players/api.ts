@@ -1,4 +1,4 @@
-import { postJson, request } from "../api/client";
+import { patchJson, postJson, request } from "../api/client";
 
 export interface Player {
   id: number;
@@ -30,6 +30,10 @@ export function listPlayers(): Promise<{ players: Player[] }> {
 
 export function createPlayer(name: string): Promise<Player> {
   return postJson("/api/players", { name });
+}
+
+export function updatePlayer(playerId: number, name: string): Promise<Player> {
+  return patchJson(`/api/players/${playerId}`, { name });
 }
 
 export function getPlayerLayouts(

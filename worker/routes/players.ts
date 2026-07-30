@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from "../types";
-import { createPlayerSchema } from "../schemas";
+import { createPlayerSchema, updatePlayerSchema } from "../schemas";
 
 interface PlayerRow {
   id: number;
@@ -59,6 +59,34 @@ playersRoute.get("/", async (c) => {
       createdAt: row.created_at,
     })),
   });
+});
+
+playersRoute.patch("/:playerId", async (c) => {
+  const playerId = Number(c.req.param("playerId"));
+  if (!Number.isInteger(playerId)) {
+    return c.json({ error: "Invalid player id" }, 400);
+  }
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = updatePlayerSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.flatten() }, 400);
+  }
+
+  const existing = await c.env.DB.prepare("SELECT id FROM players WHERE id = ?")
+    .bind(playerId)
+    .first();
+  if (!existing) {
+    return c.json({ error: "Player not found" }, 404);
+  }
+
+  const row = await c.env.DB.prepare(
+    "UPDATE players SET name = ? WHERE id = ? RETURNING id, name, created_at",
+  )
+    .bind(parsed.data.name, playerId)
+    .first<PlayerRow>();
+
+  return c.json({ id: row!.id, name: row!.name, createdAt: row!.created_at });
 });
 
 playersRoute.get("/:playerId/layouts", async (c) => {

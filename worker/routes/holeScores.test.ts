@@ -1,6 +1,7 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import app from "../index";
+import { seedCourse } from "../test/seed";
 
 async function json<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
@@ -11,24 +12,10 @@ async function request(path: string, init?: RequestInit): Promise<Response> {
 }
 
 async function setUpRoundWithOneScore() {
-  const course = await json<{ id: number }>(
-    await request("/api/courses", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Maple Hill" }),
-    }),
-  );
-  const layout = await json<{ id: number }>(
-    await request(`/api/courses/${course.id}/layouts`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Blue" }),
-    }),
-  );
-  await request(`/api/layouts/${layout.id}/holes`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ number: 1, par: 3 }),
+  const { courseId, layoutId } = await seedCourse(env, {
+    courseName: "Maple Hill",
+    layoutName: "Blue",
+    holes: [{ number: 1, par: 3 }],
   });
   const player = await json<{ id: number }>(
     await request("/api/players", {
@@ -45,8 +32,8 @@ async function setUpRoundWithOneScore() {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        courseId: course.id,
-        layoutId: layout.id,
+        courseId,
+        layoutId,
         playerIds: [player.id],
       }),
     }),

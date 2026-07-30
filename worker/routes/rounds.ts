@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from "../types";
-import { createRoundSchema } from "../schemas";
+import { createRoundSchema, updateRoundSchema } from "../schemas";
 
 interface RoundRow {
   id: number;
@@ -8,12 +8,14 @@ interface RoundRow {
   layout_id: number;
   created_at: string;
   completed_at: string | null;
+  counting: number;
 }
 
 interface RoundListRow {
   id: number;
   created_at: string;
   completed_at: string | null;
+  counting: number;
   course_name: string;
   layout_name: string;
   player_count: number;
@@ -43,7 +45,7 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
   const round = await db
     .prepare(
       `SELECT rounds.id, rounds.course_id, rounds.layout_id, rounds.created_at,
-              rounds.completed_at,
+              rounds.completed_at, rounds.counting,
               courses.name AS course_name, layouts.name AS layout_name
        FROM rounds
        JOIN courses ON courses.id = rounds.course_id
@@ -90,6 +92,7 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
     id: round.id,
     createdAt: round.created_at,
     completedAt: round.completed_at,
+    counting: Boolean(round.counting),
     course: { id: round.course_id, name: round.course_name },
     layout: { id: round.layout_id, name: round.layout_name },
     holes: holeRows.map((hole) => ({
@@ -207,7 +210,7 @@ roundsRoute.get("/", async (c) => {
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const { results } = await c.env.DB.prepare(
-    `SELECT rounds.id, rounds.created_at, rounds.completed_at,
+    `SELECT rounds.id, rounds.created_at, rounds.completed_at, rounds.counting,
             courses.name AS course_name, layouts.name AS layout_name,
             COUNT(DISTINCT round_players.player_id) AS player_count
      FROM rounds
@@ -226,6 +229,7 @@ roundsRoute.get("/", async (c) => {
       id: row.id,
       createdAt: row.created_at,
       completedAt: row.completed_at,
+      counting: Boolean(row.counting),
       courseName: row.course_name,
       layoutName: row.layout_name,
       playerCount: row.player_count,
@@ -244,6 +248,105 @@ roundsRoute.get("/:roundId", async (c) => {
     return c.json({ error: "Round not found" }, 404);
   }
 
+  return c.json(detail);
+});
+
+roundsRoute.patch("/:roundId", async (c) => {
+  const roundId = Number(c.req.param("roundId"));
+  if (!Number.isInteger(roundId)) {
+    return c.json({ error: "Invalid round id" }, 400);
+  }
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = updateRoundSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.flatten() }, 400);
+  }
+
+  const round = await c.env.DB.prepare(
+    "SELECT id, layout_id, completed_at FROM rounds WHERE id = ?",
+  )
+    .bind(roundId)
+    .first<{ id: number; layout_id: number; completed_at: string | null }>();
+  if (!round) {
+    return c.json({ error: "Round not found" }, 404);
+  }
+
+  const { playerIds, counting } = parsed.data;
+
+  if (playerIds !== undefined) {
+    if (round.completed_at) {
+      return c.json(
+        { error: "Cannot change players on a completed round" },
+        409,
+      );
+    }
+
+    const uniquePlayerIds = [...new Set(playerIds)];
+    const placeholders = uniquePlayerIds.map(() => "?").join(",");
+    const { results: existingPlayers } = await c.env.DB.prepare(
+      `SELECT id FROM players WHERE id IN (${placeholders})`,
+    )
+      .bind(...uniquePlayerIds)
+      .all();
+    if (existingPlayers.length !== uniquePlayerIds.length) {
+      return c.json({ error: "One or more players were not found" }, 404);
+    }
+
+    const { results: currentPlayers } = await c.env.DB.prepare(
+      "SELECT player_id FROM round_players WHERE round_id = ?",
+    )
+      .bind(roundId)
+      .all<{ player_id: number }>();
+    const currentIds = new Set(currentPlayers.map((row) => row.player_id));
+    const desiredIds = new Set(uniquePlayerIds);
+
+    const toRemove = [...currentIds].filter((id) => !desiredIds.has(id));
+    const toAdd = [...desiredIds].filter((id) => !currentIds.has(id));
+
+    const { results: holes } = await c.env.DB.prepare(
+      "SELECT id, par FROM holes WHERE layout_id = ?",
+    )
+      .bind(round.layout_id)
+      .all<{ id: number; par: number }>();
+
+    const statements = [
+      ...toRemove.map((playerId) =>
+        c.env.DB.prepare(
+          "DELETE FROM hole_scores WHERE round_id = ? AND player_id = ?",
+        ).bind(roundId, playerId),
+      ),
+      ...toRemove.map((playerId) =>
+        c.env.DB.prepare(
+          "DELETE FROM round_players WHERE round_id = ? AND player_id = ?",
+        ).bind(roundId, playerId),
+      ),
+      ...toAdd.map((playerId) =>
+        c.env.DB.prepare(
+          "INSERT INTO round_players (round_id, player_id) VALUES (?, ?)",
+        ).bind(roundId, playerId),
+      ),
+      ...toAdd.flatMap((playerId) =>
+        holes.map((hole) =>
+          c.env.DB.prepare(
+            `INSERT INTO hole_scores (round_id, player_id, hole_id, strokes, penalties)
+             VALUES (?, ?, ?, ?, 0)`,
+          ).bind(roundId, playerId, hole.id, hole.par),
+        ),
+      ),
+    ];
+    if (statements.length > 0) {
+      await c.env.DB.batch(statements);
+    }
+  }
+
+  if (counting !== undefined) {
+    await c.env.DB.prepare("UPDATE rounds SET counting = ? WHERE id = ?")
+      .bind(counting ? 1 : 0, roundId)
+      .run();
+  }
+
+  const detail = await buildRoundDetail(c.env.DB, roundId);
   return c.json(detail);
 });
 

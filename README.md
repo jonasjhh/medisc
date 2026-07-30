@@ -69,22 +69,21 @@ D1 database bound as `DB` in `wrangler.toml`:
 
 **Courses** (`worker/routes/courses.ts`)
 
-- `POST /api/courses` — body `{ name }` → creates a course.
+Courses, layouts, and holes are read-only from the API — for now they're
+only ever added via migrations (see `migrations/0004_seed_dragvoll.sql` for
+an example), not through the app.
+
 - `GET /api/courses` — lists courses with their layout count.
 - `GET /api/courses/:courseId` — a course with its layouts, each with its
   holes, nested.
-- `POST /api/courses/:courseId/layouts` — body `{ name }` → adds a layout.
-
-**Layouts** (`worker/routes/layouts.ts`)
-
-- `POST /api/layouts/:layoutId/holes` — body
-  `{ number, par, distanceMeters? }` → adds a hole to that layout. Rejects a
-  duplicate hole `number` on the same layout with `409`.
 
 **Players** (`worker/routes/players.ts`)
 
 - `POST /api/players` — body `{ name }` → adds a player to the roster.
 - `GET /api/players` — lists all players.
+- `PATCH /api/players/:playerId` — body `{ name }` → renames a player.
+  Since rounds only store a `player_id`, this instantly updates their name
+  everywhere (round history, stats). 404s if the player doesn't exist.
 - `GET /api/players/:playerId/layouts` — distinct course/layout combos the
   player has _completed_ rounds on, for populating a stats filter. 404s if
   the player doesn't exist.
@@ -98,17 +97,24 @@ D1 database bound as `DB` in `wrangler.toml`:
 - `POST /api/rounds` — body `{ courseId, layoutId, playerIds }` → creates a
   round, seeds a score (strokes = par, penalties = 0) for every player ×
   hole, and returns the full round detail (course, layout, holes, players,
-  scores). 404s if the layout doesn't belong to the course, or if any
-  player id doesn't exist.
+  scores, `counting`). 404s if the layout doesn't belong to the course, or
+  if any player id doesn't exist. `counting` defaults to `true`.
 - `GET /api/rounds` — lists rounds (course/layout name, player count,
   completion state), newest first. Supports `?status=completed`
   /`?status=in_progress`, `?playerId=`, and `?courseId=` filters,
   combinable and all optional.
 - `GET /api/rounds/:roundId` — the same detail shape `POST` returns, for
   resuming a round already in progress.
+- `PATCH /api/rounds/:roundId` — body `{ playerIds?, counting? }`, either or
+  both. `playerIds` swaps who's in the round — added players get par-seeded
+  scores for every hole, removed players' scores are deleted; 409s once the
+  round is completed (players are locked in at that point). `counting`
+  flags whether the round should count towards stats and can be toggled
+  any time, including after completion (for retroactively excluding a
+  casual round). 404s if the round doesn't exist.
 - `POST /api/rounds/:roundId/complete` — marks the round done (sets
-  `completedAt`), locking its scores from further edits. 404s if the round
-  doesn't exist.
+  `completedAt`), locking its scores and player list from further edits.
+  404s if the round doesn't exist.
 
 **Hole scores** (`worker/routes/holeScores.ts`)
 
@@ -117,9 +123,9 @@ D1 database bound as `DB` in `wrangler.toml`:
   left as-is); `strokes` can't go below 1, `penalties` not below 0. 409s if
   the round it belongs to has already been completed.
 
-The frontend lives in `src/courses/` (`/courses`, `/courses/:courseId`),
-`src/rounds/` (`/rounds`, `/rounds/new`, `/rounds/:roundId`), and
-`src/players/` (`/players`, `/players/:playerId` for per-layout stats).
+The frontend lives in `src/courses/` (`/courses`, `/courses/:courseId`,
+read-only), `src/rounds/` (`/rounds`, `/rounds/new`, `/rounds/:roundId`),
+and `src/players/` (`/players`, `/players/:playerId` for per-layout stats).
 
 `wrangler.toml` also serves the built frontend (`dist/`) as static assets,
 so the Worker is the single deployable that hosts both the API and the app.

@@ -5,14 +5,20 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Checkbox from "@mui/material/Checkbox";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import FormGroup from "@mui/material/FormGroup";
 import IconButton from "@mui/material/IconButton";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
+import Switch from "@mui/material/Switch";
 import Typography from "@mui/material/Typography";
-import { completeRound, getRound, updateHoleScore } from "./api";
+import { listPlayers } from "../players/api";
+import type { Player } from "../players/api";
+import { completeRound, getRound, updateHoleScore, updateRound } from "./api";
 import type { RoundDetail } from "./api";
 import { ScoreAdjuster } from "./ScoreAdjuster";
 
@@ -28,6 +34,14 @@ export function RoundPage() {
   const [error, setError] = useState<string | null>(null);
   const [holeIndex, setHoleIndex] = useState(0);
   const [finishing, setFinishing] = useState(false);
+  const [togglingCounting, setTogglingCounting] = useState(false);
+
+  const [allPlayers, setAllPlayers] = useState<Player[]>([]);
+  const [editingPlayers, setEditingPlayers] = useState(false);
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(
+    new Set(),
+  );
+  const [savingPlayers, setSavingPlayers] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -43,6 +57,13 @@ export function RoundPage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    void (async () => {
+      const { players } = await listPlayers();
+      setAllPlayers(players);
+    })();
+  }, []);
 
   const adjust = async (scoreId: number, field: Field, delta: number) => {
     if (!round) {
@@ -83,6 +104,61 @@ export function RoundPage() {
       setError(err instanceof Error ? err.message : "Failed to finish round");
     } finally {
       setFinishing(false);
+    }
+  };
+
+  const handleToggleCounting = async () => {
+    if (!round) {
+      return;
+    }
+    setTogglingCounting(true);
+    setError(null);
+    try {
+      const updated = await updateRound(id, { counting: !round.counting });
+      setRound(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update round");
+    } finally {
+      setTogglingCounting(false);
+    }
+  };
+
+  const startEditingPlayers = () => {
+    if (!round) {
+      return;
+    }
+    setSelectedPlayerIds(new Set(round.players.map((player) => player.id)));
+    setEditingPlayers(true);
+  };
+
+  const togglePlayer = (playerId: number) => {
+    setSelectedPlayerIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(playerId)) {
+        next.delete(playerId);
+      } else {
+        next.add(playerId);
+      }
+      return next;
+    });
+  };
+
+  const handleSavePlayers = async () => {
+    if (selectedPlayerIds.size === 0) {
+      return;
+    }
+    setSavingPlayers(true);
+    setError(null);
+    try {
+      const updated = await updateRound(id, {
+        playerIds: [...selectedPlayerIds],
+      });
+      setRound(updated);
+      setEditingPlayers(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update players");
+    } finally {
+      setSavingPlayers(false);
     }
   };
 
@@ -135,6 +211,71 @@ export function RoundPage() {
           </Button>
         )}
       </Stack>
+
+      <FormControlLabel
+        sx={{ mb: 2 }}
+        control={
+          <Switch
+            checked={round.counting}
+            disabled={togglingCounting}
+            onChange={() => void handleToggleCounting()}
+          />
+        }
+        label="Counting round"
+      />
+
+      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+        >
+          <Typography variant="subtitle1" fontWeight={600}>
+            Players
+          </Typography>
+          {!isCompleted && !editingPlayers && (
+            <Button size="small" onClick={startEditingPlayers}>
+              Manage players
+            </Button>
+          )}
+        </Stack>
+
+        {editingPlayers ? (
+          <>
+            <FormGroup>
+              {allPlayers.map((player) => (
+                <FormControlLabel
+                  key={player.id}
+                  control={
+                    <Checkbox
+                      checked={selectedPlayerIds.has(player.id)}
+                      onChange={() => togglePlayer(player.id)}
+                    />
+                  }
+                  label={player.name}
+                />
+              ))}
+            </FormGroup>
+            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+              <Button
+                size="small"
+                variant="contained"
+                disabled={savingPlayers || selectedPlayerIds.size === 0}
+                onClick={() => void handleSavePlayers()}
+              >
+                Save players
+              </Button>
+              <Button size="small" onClick={() => setEditingPlayers(false)}>
+                Cancel
+              </Button>
+            </Stack>
+          </>
+        ) : (
+          <Typography color="text.secondary">
+            {round.players.map((player) => player.name).join(", ")}
+          </Typography>
+        )}
+      </Paper>
 
       <Stack
         direction="row"

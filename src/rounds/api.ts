@@ -4,6 +4,7 @@ export interface RoundSummary {
   id: number;
   createdAt: string;
   completedAt: string | null;
+  counting: boolean;
   courseName: string;
   layoutName: string;
   playerCount: number;
@@ -33,6 +34,7 @@ export interface RoundDetail {
   id: number;
   createdAt: string;
   completedAt: string | null;
+  counting: boolean;
   course: { id: number; name: string };
   layout: { id: number; name: string };
   holes: RoundHole[];
@@ -84,4 +86,11 @@ export function updateHoleScore(
 
 export function completeRound(roundId: number): Promise<RoundDetail> {
   return postJson(`/api/rounds/${roundId}/complete`, {});
+}
+
+export function updateRound(
+  roundId: number,
+  input: { playerIds?: number[]; counting?: boolean },
+): Promise<RoundDetail> {
+  return patchJson(`/api/rounds/${roundId}`, input);
 }

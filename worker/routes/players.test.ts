@@ -1,6 +1,7 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import app from "../index";
+import { seedCourse } from "../test/seed";
 
 interface PlayerResponse {
   id: number;
@@ -52,6 +53,55 @@ describe("players API", () => {
     });
     expect(res.status).toBe(400);
   });
+
+  it("renames a player", async () => {
+    const created = await json<PlayerResponse>(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Jonas" }),
+      }),
+    );
+
+    const res = await request(`/api/players/${created.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Jon" }),
+    });
+    expect(res.status).toBe(200);
+    const updated = await json<PlayerResponse>(res);
+    expect(updated).toMatchObject({ id: created.id, name: "Jon" });
+
+    const listRes = await request("/api/players");
+    const { players } = await json<{ players: PlayerResponse[] }>(listRes);
+    expect(players[0].name).toBe("Jon");
+  });
+
+  it("404s when renaming a player that doesn't exist", async () => {
+    const res = await request("/api/players/999", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Jon" }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects an empty name on rename", async () => {
+    const created = await json<PlayerResponse>(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Jonas" }),
+      }),
+    );
+
+    const res = await request(`/api/players/${created.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "" }),
+    });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe("player stats", () => {
@@ -65,27 +115,12 @@ describe("player stats", () => {
     await env.DB.exec("DELETE FROM players");
   });
 
-  async function setUpCourseWithOneHole() {
-    const course = await json<{ id: number }>(
-      await request("/api/courses", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Maple Hill" }),
-      }),
-    );
-    const layout = await json<{ id: number }>(
-      await request(`/api/courses/${course.id}/layouts`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Blue" }),
-      }),
-    );
-    await request(`/api/layouts/${layout.id}/holes`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ number: 1, par: 3 }),
+  function setUpCourseWithOneHole() {
+    return seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [{ number: 1, par: 3 }],
     });
-    return { courseId: course.id, layoutId: layout.id };
   }
 
   async function playRound(
