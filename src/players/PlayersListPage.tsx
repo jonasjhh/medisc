@@ -2,11 +2,18 @@ import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
 import IconButton from "@mui/material/IconButton";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -14,9 +21,10 @@ import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
 import Paper from "@mui/material/Paper";
 import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { AddPlayerForm } from "./AddPlayerForm";
-import { listPlayers, updatePlayer } from "./api";
+import { deletePlayer, listPlayers, updatePlayer } from "./api";
 import type { Player } from "./api";
 
 type Status = "loading" | "ready" | "error";
@@ -27,6 +35,8 @@ export function PlayersListPage() {
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draftName, setDraftName] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Player | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -75,6 +85,25 @@ export function PlayersListPage() {
     );
   };
 
+  const handleDelete = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+    setDeleting(true);
+    setError(null);
+    try {
+      await deletePlayer(deleteTarget.id);
+      setPlayers((prev) =>
+        prev.filter((player) => player.id !== deleteTarget.id),
+      );
+      setDeleteTarget(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete player");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Container maxWidth="sm" sx={{ py: 4 }}>
       <Typography variant="h4" component="h1" gutterBottom>
@@ -118,13 +147,32 @@ export function PlayersListPage() {
                     </IconButton>
                   </>
                 ) : (
-                  <IconButton
-                    edge="end"
-                    aria-label={`edit ${player.name}`}
-                    onClick={() => startEdit(player)}
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
+                  <>
+                    <IconButton
+                      aria-label={`edit ${player.name}`}
+                      onClick={() => startEdit(player)}
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <Tooltip
+                      title={
+                        player.roundCount > 0
+                          ? "Can't delete a player with recorded rounds"
+                          : ""
+                      }
+                    >
+                      <span>
+                        <IconButton
+                          edge="end"
+                          aria-label={`delete ${player.name}`}
+                          disabled={player.roundCount > 0}
+                          onClick={() => setDeleteTarget(player)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </>
                 )
               }
             >
@@ -143,6 +191,7 @@ export function PlayersListPage() {
                 <ListItemButton
                   component={RouterLink}
                   to={`/players/${player.id}`}
+                  sx={{ pr: 12 }}
                 >
                   <ListItemText primary={player.name} />
                 </ListItemButton>
@@ -156,6 +205,28 @@ export function PlayersListPage() {
           )}
         </List>
       )}
+
+      <Dialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+      >
+        <DialogTitle>Delete {deleteTarget?.name}?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This removes them from the roster. This can't be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
+          <Button
+            color="error"
+            disabled={deleting}
+            onClick={() => void handleDelete()}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

@@ -16,6 +16,7 @@ describe("AddPlayerForm", () => {
       id: 1,
       name: "Alice",
       createdAt: "",
+      roundCount: 0,
     });
     const onAdded = vi.fn();
     const user = userEvent.setup();
@@ -31,6 +32,7 @@ describe("AddPlayerForm", () => {
       id: 1,
       name: "Alice",
       createdAt: "",
+      roundCount: 0,
     });
     expect(input).toHaveValue("");
   });

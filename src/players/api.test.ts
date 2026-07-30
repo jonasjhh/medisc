@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createPlayer,
+  deletePlayer,
   getPlayerLayouts,
   getPlayerStats,
   listPlayers,
@@ -12,6 +13,18 @@ function mockFetchOnce(body: unknown, init: { ok?: boolean } = {}) {
     ok: init.ok ?? true,
     status: init.ok === false ? 400 : 200,
     json: async () => body,
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function mockNoContentFetchOnce() {
+  const fetchMock = vi.fn().mockResolvedValue({
+    ok: true,
+    status: 204,
+    json: async () => {
+      throw new Error("no body");
+    },
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
@@ -73,6 +86,15 @@ describe("players api", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/players/1/stats?layoutId=2",
       undefined,
+    );
+  });
+
+  it("deletes a player", async () => {
+    const fetchMock = mockNoContentFetchOnce();
+    await deletePlayer(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/players/1",
+      expect.objectContaining({ method: "DELETE" }),
     );
   });
 });

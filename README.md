@@ -91,6 +91,10 @@ an example), not through the app.
   (times played, avg/best/worst strokes, avg penalties) across the
   player's completed rounds on that layout only. 400s without a
   `layoutId`, 404s if the player doesn't exist.
+- `DELETE /api/players/:playerId` — removes a player from the roster.
+  409s if the player has ever been part of any round (`roundCount > 0`,
+  a field included on every player response); 404s if the player
+  doesn't exist.
 
 **Rounds** (`worker/routes/rounds.ts`)
 
@@ -118,6 +122,9 @@ an example), not through the app.
 - `POST /api/rounds/:roundId/reopen` — clears `completedAt`, unlocking
   scores and the player list again. A no-op if the round is already in
   progress. 404s if the round doesn't exist.
+- `DELETE /api/rounds/:roundId` — permanently removes the round along
+  with its player list and hole scores. Allowed regardless of
+  completion state. 404s if the round doesn't exist.
 
 **Hole scores** (`worker/routes/holeScores.ts`)
 

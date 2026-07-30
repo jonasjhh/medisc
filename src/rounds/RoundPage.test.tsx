@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -31,6 +31,7 @@ function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/rounds/1"]}>
       <Routes>
+        <Route path="/rounds" element={<div>Rounds list page</div>} />
         <Route path="/rounds/:roundId" element={<RoundPage />} />
       </Routes>
     </MemoryRouter>,
@@ -39,11 +40,12 @@ function renderPage() {
 
 describe("RoundPage", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(roundsApi.getRound).mockResolvedValue(baseRound);
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
       players: [
-        { id: 1, name: "Alice", createdAt: "" },
-        { id: 2, name: "Bob", createdAt: "" },
+        { id: 1, name: "Alice", createdAt: "", roundCount: 1 },
+        { id: 2, name: "Bob", createdAt: "", roundCount: 0 },
       ],
     });
   });
@@ -264,5 +266,60 @@ describe("RoundPage", () => {
     expect(
       screen.queryByRole("button", { name: "Birdie" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("deletes the round after confirming in the dialog", async () => {
+    vi.mocked(roundsApi.deleteRound).mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: /delete round/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /delete/i }));
+
+    expect(roundsApi.deleteRound).toHaveBeenCalledWith(1);
+    expect(await screen.findByText("Rounds list page")).toBeInTheDocument();
+  });
+
+  it("cancels round deletion without calling the API", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: /delete round/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
+
+    expect(roundsApi.deleteRound).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("swaps a single player with the per-row swap control", async () => {
+    vi.mocked(roundsApi.updateRound).mockResolvedValue({
+      ...baseRound,
+      players: [{ id: 2, name: "Bob" }],
+      scores: [
+        { id: 2000, holeId: 100, playerId: 2, strokes: 3, penalties: 0 },
+        { id: 2001, holeId: 101, playerId: 2, strokes: 4, penalties: 0 },
+      ],
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: /manage players/i }));
+
+    await user.click(await screen.findByLabelText("Swap for"));
+    await user.click(await screen.findByRole("option", { name: "Bob" }));
+    await user.click(screen.getByRole("button", { name: /save players/i }));
+
+    expect(roundsApi.updateRound).toHaveBeenCalledWith(1, {
+      playerIds: [2],
+    });
   });
 });

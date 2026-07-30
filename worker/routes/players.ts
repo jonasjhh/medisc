@@ -8,6 +8,10 @@ interface PlayerRow {
   created_at: string;
 }
 
+interface PlayerListRow extends PlayerRow {
+  round_count: number;
+}
+
 interface PlayedLayoutRow {
   course_id: number;
   course_name: string;
@@ -26,6 +30,16 @@ interface HoleStatRow {
   avg_penalties: number;
 }
 
+async function countPlayerRounds(db: D1Database, playerId: number) {
+  const row = await db
+    .prepare(
+      "SELECT COUNT(DISTINCT round_id) AS round_count FROM round_players WHERE player_id = ?",
+    )
+    .bind(playerId)
+    .first<{ round_count: number }>();
+  return row!.round_count;
+}
+
 export const playersRoute = new Hono<{ Bindings: Env }>();
 
 playersRoute.post("/", async (c) => {
@@ -42,21 +56,27 @@ playersRoute.post("/", async (c) => {
     .first<PlayerRow>();
 
   return c.json(
-    { id: row!.id, name: row!.name, createdAt: row!.created_at },
+    { id: row!.id, name: row!.name, createdAt: row!.created_at, roundCount: 0 },
     201,
   );
 });
 
 playersRoute.get("/", async (c) => {
   const { results } = await c.env.DB.prepare(
-    "SELECT id, name, created_at FROM players ORDER BY name",
-  ).all<PlayerRow>();
+    `SELECT players.id, players.name, players.created_at,
+            COUNT(DISTINCT round_players.round_id) AS round_count
+     FROM players
+     LEFT JOIN round_players ON round_players.player_id = players.id
+     GROUP BY players.id
+     ORDER BY players.name`,
+  ).all<PlayerListRow>();
 
   return c.json({
     players: results.map((row) => ({
       id: row.id,
       name: row.name,
       createdAt: row.created_at,
+      roundCount: row.round_count,
     })),
   });
 });
@@ -86,7 +106,43 @@ playersRoute.patch("/:playerId", async (c) => {
     .bind(parsed.data.name, playerId)
     .first<PlayerRow>();
 
-  return c.json({ id: row!.id, name: row!.name, createdAt: row!.created_at });
+  const roundCount = await countPlayerRounds(c.env.DB, playerId);
+
+  return c.json({
+    id: row!.id,
+    name: row!.name,
+    createdAt: row!.created_at,
+    roundCount,
+  });
+});
+
+playersRoute.delete("/:playerId", async (c) => {
+  const playerId = Number(c.req.param("playerId"));
+  if (!Number.isInteger(playerId)) {
+    return c.json({ error: "Invalid player id" }, 400);
+  }
+
+  const existing = await c.env.DB.prepare("SELECT id FROM players WHERE id = ?")
+    .bind(playerId)
+    .first();
+  if (!existing) {
+    return c.json({ error: "Player not found" }, 404);
+  }
+
+  const roundCount = await countPlayerRounds(c.env.DB, playerId);
+
+  if (roundCount > 0) {
+    return c.json(
+      { error: "Cannot delete a player with recorded rounds" },
+      409,
+    );
+  }
+
+  await c.env.DB.prepare("DELETE FROM players WHERE id = ?")
+    .bind(playerId)
+    .run();
+
+  return c.body(null, 204);
 });
 
 playersRoute.get("/:playerId/layouts", async (c) => {

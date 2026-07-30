@@ -222,6 +222,54 @@ describe("rounds API", () => {
     expect(res.status).toBe(404);
   });
 
+  it("deletes a round along with its players and scores", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const created = await json<{ id: number }>(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+    );
+
+    const res = await request(`/api/rounds/${created.id}`, {
+      method: "DELETE",
+    });
+    expect(res.status).toBe(204);
+
+    const getRes = await request(`/api/rounds/${created.id}`);
+    expect(getRes.status).toBe(404);
+
+    const listRes = await json<{ rounds: unknown[] }>(
+      await request("/api/rounds"),
+    );
+    expect(listRes.rounds).toHaveLength(0);
+  });
+
+  it("allows deleting a completed round", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const created = await json<{ id: number }>(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+    );
+    await request(`/api/rounds/${created.id}/complete`, { method: "POST" });
+
+    const res = await request(`/api/rounds/${created.id}`, {
+      method: "DELETE",
+    });
+    expect(res.status).toBe(204);
+  });
+
+  it("404s when deleting a round that doesn't exist", async () => {
+    const res = await request("/api/rounds/999", { method: "DELETE" });
+    expect(res.status).toBe(404);
+  });
+
   it("filters the rounds list by status, player, and course", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const { courseId: otherCourseId } = await seedCourse(env, {

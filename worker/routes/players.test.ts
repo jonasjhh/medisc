@@ -7,6 +7,7 @@ interface PlayerResponse {
   id: number;
   name: string;
   createdAt: string;
+  roundCount: number;
 }
 
 async function json<T>(response: Response): Promise<T> {
@@ -36,12 +37,17 @@ describe("players API", () => {
     });
     expect(createRes.status).toBe(201);
     const created = await json<PlayerResponse>(createRes);
-    expect(created).toMatchObject({ name: "Jonas" });
+    expect(created).toMatchObject({ name: "Jonas", roundCount: 0 });
 
     const listRes = await request("/api/players");
     const { players } = await json<{ players: PlayerResponse[] }>(listRes);
     expect(players).toEqual([
-      { id: created.id, name: "Jonas", createdAt: created.createdAt },
+      {
+        id: created.id,
+        name: "Jonas",
+        createdAt: created.createdAt,
+        roundCount: 0,
+      },
     ]);
   });
 
@@ -101,6 +107,61 @@ describe("players API", () => {
       body: JSON.stringify({ name: "" }),
     });
     expect(res.status).toBe(400);
+  });
+
+  it("deletes a player with no recorded rounds", async () => {
+    const created = await json<PlayerResponse>(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Jonas" }),
+      }),
+    );
+
+    const res = await request(`/api/players/${created.id}`, {
+      method: "DELETE",
+    });
+    expect(res.status).toBe(204);
+
+    const { players } = await json<{ players: PlayerResponse[] }>(
+      await request("/api/players"),
+    );
+    expect(players).toHaveLength(0);
+  });
+
+  it("404s when deleting a player that doesn't exist", async () => {
+    const res = await request("/api/players/999", { method: "DELETE" });
+    expect(res.status).toBe(404);
+  });
+
+  it("refuses to delete a player with recorded rounds", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const player = await json<PlayerResponse>(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+    );
+    await request("/api/rounds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courseId, layoutId, playerIds: [player.id] }),
+    });
+
+    const listRes = await json<{ players: PlayerResponse[] }>(
+      await request("/api/players"),
+    );
+    expect(listRes.players[0].roundCount).toBe(1);
+
+    const res = await request(`/api/players/${player.id}`, {
+      method: "DELETE",
+    });
+    expect(res.status).toBe(409);
   });
 });
 

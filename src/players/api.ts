@@ -1,9 +1,10 @@
-import { patchJson, postJson, request } from "../api/client";
+import { deleteRequest, patchJson, postJson, request } from "../api/client";
 
 export interface Player {
   id: number;
   name: string;
   createdAt: string;
+  roundCount: number;
 }
 
 export interface PlayedLayout {
@@ -34,6 +35,10 @@ export function createPlayer(name: string): Promise<Player> {
 
 export function updatePlayer(playerId: number, name: string): Promise<Player> {
   return patchJson(`/api/players/${playerId}`, { name });
+}
+
+export function deletePlayer(playerId: number): Promise<void> {
+  return deleteRequest(`/api/players/${playerId}`);
 }
 
 export function getPlayerLayouts(

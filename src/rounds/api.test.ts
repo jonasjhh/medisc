@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   completeRound,
   createRound,
+  deleteRound,
   getRound,
   listRounds,
   reopenRound,
@@ -14,6 +15,18 @@ function mockFetchOnce(body: unknown, init: { ok?: boolean } = {}) {
     ok: init.ok ?? true,
     status: init.ok === false ? 400 : 200,
     json: async () => body,
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function mockNoContentFetchOnce() {
+  const fetchMock = vi.fn().mockResolvedValue({
+    ok: true,
+    status: 204,
+    json: async () => {
+      throw new Error("no body");
+    },
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
@@ -110,6 +123,15 @@ describe("rounds api", () => {
         method: "PATCH",
         body: JSON.stringify({ playerIds: [2, 3], counting: false }),
       }),
+    );
+  });
+
+  it("deletes a round", async () => {
+    const fetchMock = mockNoContentFetchOnce();
+    await deleteRound(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rounds/1",
+      expect.objectContaining({ method: "DELETE" }),
     );
   });
 });

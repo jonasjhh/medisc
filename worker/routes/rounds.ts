@@ -373,6 +373,32 @@ roundsRoute.post("/:roundId/complete", async (c) => {
   return c.json(detail);
 });
 
+roundsRoute.delete("/:roundId", async (c) => {
+  const roundId = Number(c.req.param("roundId"));
+  if (!Number.isInteger(roundId)) {
+    return c.json({ error: "Invalid round id" }, 400);
+  }
+
+  const round = await c.env.DB.prepare("SELECT id FROM rounds WHERE id = ?")
+    .bind(roundId)
+    .first();
+  if (!round) {
+    return c.json({ error: "Round not found" }, 404);
+  }
+
+  await c.env.DB.batch([
+    c.env.DB.prepare("DELETE FROM hole_scores WHERE round_id = ?").bind(
+      roundId,
+    ),
+    c.env.DB.prepare("DELETE FROM round_players WHERE round_id = ?").bind(
+      roundId,
+    ),
+    c.env.DB.prepare("DELETE FROM rounds WHERE id = ?").bind(roundId),
+  ]);
+
+  return c.body(null, 204);
+});
+
 roundsRoute.post("/:roundId/reopen", async (c) => {
   const roundId = Number(c.req.param("roundId"));
   if (!Number.isInteger(roundId)) {

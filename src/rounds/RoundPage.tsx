@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link as RouterLink, useParams } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import Alert from "@mui/material/Alert";
@@ -9,10 +9,19 @@ import Checkbox from "@mui/material/Checkbox";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
+import FormControl from "@mui/material/FormControl";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import FormGroup from "@mui/material/FormGroup";
 import IconButton from "@mui/material/IconButton";
+import InputLabel from "@mui/material/InputLabel";
+import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
+import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import ToggleButton from "@mui/material/ToggleButton";
@@ -22,6 +31,7 @@ import { listPlayers } from "../players/api";
 import type { Player } from "../players/api";
 import {
   completeRound,
+  deleteRound,
   getRound,
   reopenRound,
   updateHoleScore,
@@ -36,6 +46,7 @@ type Field = "strokes" | "penalties";
 export function RoundPage() {
   const { roundId } = useParams();
   const id = Number(roundId);
+  const navigate = useNavigate();
 
   const [round, setRound] = useState<RoundDetail | null>(null);
   const [status, setStatus] = useState<Status>("loading");
@@ -51,6 +62,9 @@ export function RoundPage() {
     new Set(),
   );
   const [savingPlayers, setSavingPlayers] = useState(false);
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -152,6 +166,19 @@ export function RoundPage() {
     }
   };
 
+  const handleDeleteRound = async () => {
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteRound(id);
+      navigate("/rounds");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete round");
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
   const startEditingPlayers = () => {
     if (!round) {
       return;
@@ -168,6 +195,15 @@ export function RoundPage() {
       } else {
         next.add(playerId);
       }
+      return next;
+    });
+  };
+
+  const swapPlayer = (currentPlayerId: number, replacementPlayerId: number) => {
+    setSelectedPlayerIds((prev) => {
+      const next = new Set(prev);
+      next.delete(currentPlayerId);
+      next.add(replacementPlayerId);
       return next;
     });
   };
@@ -213,6 +249,9 @@ export function RoundPage() {
   const isCompleted = round.completedAt !== null;
   const birdieValue = Math.max(1, hole.par - 1);
   const bogeyValue = hole.par + 1;
+  const unselectedPlayers = allPlayers.filter(
+    (player) => !selectedPlayerIds.has(player.id),
+  );
 
   return (
     <Container maxWidth="sm" sx={{ py: 4 }}>
@@ -286,18 +325,51 @@ export function RoundPage() {
         {editingPlayers ? (
           <>
             <FormGroup>
-              {allPlayers.map((player) => (
-                <FormControlLabel
-                  key={player.id}
-                  control={
-                    <Checkbox
-                      checked={selectedPlayerIds.has(player.id)}
-                      onChange={() => togglePlayer(player.id)}
+              {allPlayers.map((player) => {
+                const isSelected = selectedPlayerIds.has(player.id);
+                return (
+                  <Stack
+                    key={player.id}
+                    direction="row"
+                    alignItems="center"
+                    spacing={1}
+                    flexWrap="wrap"
+                    rowGap={0.5}
+                  >
+                    <FormControlLabel
+                      sx={{ flexGrow: 1, mr: 0 }}
+                      control={
+                        <Checkbox
+                          checked={isSelected}
+                          onChange={() => togglePlayer(player.id)}
+                        />
+                      }
+                      label={player.name}
                     />
-                  }
-                  label={player.name}
-                />
-              ))}
+                    {isSelected && unselectedPlayers.length > 0 && (
+                      <FormControl size="small" sx={{ minWidth: 150 }}>
+                        <InputLabel id={`swap-${player.id}-label`}>
+                          Swap for
+                        </InputLabel>
+                        <Select
+                          labelId={`swap-${player.id}-label`}
+                          label="Swap for"
+                          value=""
+                          onChange={(event) =>
+                            swapPlayer(player.id, Number(event.target.value))
+                          }
+                        >
+                          {unselectedPlayers.map((candidate) => (
+                            <MenuItem key={candidate.id} value={candidate.id}>
+                              {candidate.name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    )}
+                  </Stack>
+                );
+              })}
             </FormGroup>
             <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
               <Button
@@ -414,6 +486,38 @@ export function RoundPage() {
           {error}
         </Alert>
       )}
+
+      <Button
+        color="error"
+        variant="outlined"
+        sx={{ mt: 4 }}
+        onClick={() => setDeleteDialogOpen(true)}
+      >
+        Delete round
+      </Button>
+
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
+        <DialogTitle>Delete this round?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This permanently removes {round.course.name} — {round.layout.name}{" "}
+            and every score recorded for it. This can't be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button
+            color="error"
+            disabled={deleting}
+            onClick={() => void handleDeleteRound()}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

@@ -12,6 +12,9 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
           : `Request failed: ${response.status}`;
     throw new Error(message);
   }
+  if (response.status === 204) {
+    return undefined as T;
+  }
   return response.json();
 }
 
@@ -29,4 +32,8 @@ export function patchJson<T>(path: string, body: unknown): Promise<T> {
     headers: jsonHeaders,
     body: JSON.stringify(body),
   });
+}
+
+export function deleteRequest(path: string): Promise<void> {
+  return request<void>(path, { method: "DELETE" });
 }

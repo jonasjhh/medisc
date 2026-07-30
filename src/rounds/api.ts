@@ -1,4 +1,4 @@
-import { patchJson, postJson, request } from "../api/client";
+import { deleteRequest, patchJson, postJson, request } from "../api/client";
 
 export interface RoundSummary {
   id: number;
@@ -97,4 +97,8 @@ export function updateRound(
   input: { playerIds?: number[]; counting?: boolean },
 ): Promise<RoundDetail> {
   return patchJson(`/api/rounds/${roundId}`, input);
+}
+
+export function deleteRound(roundId: number): Promise<void> {
+  return deleteRequest(`/api/rounds/${roundId}`);
 }
