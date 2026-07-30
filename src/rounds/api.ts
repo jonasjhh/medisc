@@ -88,6 +88,10 @@ export function completeRound(roundId: number): Promise<RoundDetail> {
   return postJson(`/api/rounds/${roundId}/complete`, {});
 }
 
+export function reopenRound(roundId: number): Promise<RoundDetail> {
+  return postJson(`/api/rounds/${roundId}/reopen`, {});
+}
+
 export function updateRound(
   roundId: number,
   input: { playerIds?: number[]; counting?: boolean },

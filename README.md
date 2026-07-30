@@ -115,6 +115,9 @@ an example), not through the app.
 - `POST /api/rounds/:roundId/complete` — marks the round done (sets
   `completedAt`), locking its scores and player list from further edits.
   404s if the round doesn't exist.
+- `POST /api/rounds/:roundId/reopen` — clears `completedAt`, unlocking
+  scores and the player list again. A no-op if the round is already in
+  progress. 404s if the round doesn't exist.
 
 **Hole scores** (`worker/routes/holeScores.ts`)
 

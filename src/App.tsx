@@ -5,7 +5,9 @@ import {
   Routes,
 } from "react-router-dom";
 import AppBar from "@mui/material/AppBar";
+import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import { HomePage } from "./pages/HomePage";
@@ -31,15 +33,17 @@ function NavBar() {
         >
           Medisc
         </Typography>
-        <Button color="inherit" component={RouterLink} to="/rounds">
-          Rounds
-        </Button>
-        <Button color="inherit" component={RouterLink} to="/courses">
-          Courses
-        </Button>
-        <Button color="inherit" component={RouterLink} to="/players">
-          Players
-        </Button>
+        <Stack direction="row" component="nav" aria-label="Main" spacing={0.5}>
+          <Button color="inherit" component={RouterLink} to="/rounds">
+            Rounds
+          </Button>
+          <Button color="inherit" component={RouterLink} to="/courses">
+            Courses
+          </Button>
+          <Button color="inherit" component={RouterLink} to="/players">
+            Players
+          </Button>
+        </Stack>
       </Toolbar>
     </AppBar>
   );
@@ -54,16 +58,18 @@ export function App() {
       <UpdatePrompt />
       <InstallPrompt />
       <NavBar />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/courses" element={<CoursesPage />} />
-        <Route path="/courses/:courseId" element={<CourseDetailPage />} />
-        <Route path="/rounds" element={<RoundsListPage />} />
-        <Route path="/rounds/new" element={<NewRoundPage />} />
-        <Route path="/rounds/:roundId" element={<RoundPage />} />
-        <Route path="/players" element={<PlayersListPage />} />
-        <Route path="/players/:playerId" element={<PlayerStatsPage />} />
-      </Routes>
+      <Box component="main">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/courses" element={<CoursesPage />} />
+          <Route path="/courses/:courseId" element={<CourseDetailPage />} />
+          <Route path="/rounds" element={<RoundsListPage />} />
+          <Route path="/rounds/new" element={<NewRoundPage />} />
+          <Route path="/rounds/:roundId" element={<RoundPage />} />
+          <Route path="/players" element={<PlayersListPage />} />
+          <Route path="/players/:playerId" element={<PlayerStatsPage />} />
+        </Routes>
+      </Box>
     </BrowserRouter>
   );
 }

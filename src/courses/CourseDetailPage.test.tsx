@@ -15,7 +15,10 @@ const baseCourse: api.CourseDetail = {
       id: 10,
       name: "Blue",
       createdAt: "",
-      holes: [{ id: 100, number: 1, par: 3, distanceMeters: 275 }],
+      holes: [
+        { id: 100, number: 1, par: 3, distanceMeters: 275 },
+        { id: 101, number: 2, par: 4, distanceMeters: null },
+      ],
     },
   ],
 };
@@ -35,13 +38,19 @@ describe("CourseDetailPage", () => {
     vi.mocked(api.getCourse).mockResolvedValue(baseCourse);
   });
 
-  it("shows the course, its layouts, and holes", async () => {
+  it("shows the course, its layouts, and holes split across two hole tables", async () => {
     renderPage();
 
     expect(await screen.findByText("Maple Hill")).toBeInTheDocument();
     expect(screen.getByText("Blue")).toBeInTheDocument();
-    expect(screen.getByText("Hole 1 — Par 3")).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: /holes 1–1/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: /holes 2–2/i }),
+    ).toBeInTheDocument();
     expect(screen.getByText("275 m")).toBeInTheDocument();
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 
   it("shows an empty state when a course has no layouts", async () => {

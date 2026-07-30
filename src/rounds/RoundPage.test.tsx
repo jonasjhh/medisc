@@ -213,4 +213,56 @@ describe("RoundPage", () => {
       screen.queryByRole("button", { name: /manage players/i }),
     ).not.toBeInTheDocument();
   });
+
+  it("reopens a completed round, restoring the score adjusters", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+    });
+    vi.mocked(roundsApi.reopenRound).mockResolvedValue(baseRound);
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Completed");
+    await user.click(screen.getByRole("button", { name: /reopen round/i }));
+
+    expect(roundsApi.reopenRound).toHaveBeenCalledWith(1);
+    expect(await screen.findByText(/finish round/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /increase strokes/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("sets strokes to par with the quick-score buttons", async () => {
+    vi.mocked(roundsApi.updateHoleScore).mockResolvedValue({
+      id: 1000,
+      holeId: 100,
+      playerId: 1,
+      strokes: 3,
+      penalties: 0,
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: "Bogey" }));
+
+    expect(roundsApi.updateHoleScore).toHaveBeenCalledWith(1000, {
+      strokes: 4,
+    });
+    expect(await screen.findByText("4")).toBeInTheDocument();
+  });
+
+  it("does not show quick-score buttons on a completed round", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+    });
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    expect(
+      screen.queryByRole("button", { name: "Birdie" }),
+    ).not.toBeInTheDocument();
+  });
 });

@@ -168,6 +168,60 @@ describe("rounds API", () => {
     expect(res.status).toBe(404);
   });
 
+  it("reopens a completed round and allows editing scores again", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const created = await json<{
+      id: number;
+      scores: Array<{ id: number }>;
+    }>(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+    );
+    await request(`/api/rounds/${created.id}/complete`, { method: "POST" });
+
+    const res = await request(`/api/rounds/${created.id}/reopen`, {
+      method: "POST",
+    });
+    expect(res.status).toBe(200);
+    const reopened = await json<{ completedAt: string | null }>(res);
+    expect(reopened.completedAt).toBeNull();
+
+    const scoreRes = await request(`/api/hole-scores/${created.scores[0].id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ strokes: 5 }),
+    });
+    expect(scoreRes.status).toBe(200);
+  });
+
+  it("is a no-op reopening a round that's already in progress", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const created = await json<{ id: number }>(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+    );
+
+    const res = await request(`/api/rounds/${created.id}/reopen`, {
+      method: "POST",
+    });
+    expect(res.status).toBe(200);
+    const reopened = await json<{ completedAt: string | null }>(res);
+    expect(reopened.completedAt).toBeNull();
+  });
+
+  it("404s when reopening a round that doesn't exist", async () => {
+    const res = await request("/api/rounds/999/reopen", { method: "POST" });
+    expect(res.status).toBe(404);
+  });
+
   it("filters the rounds list by status, player, and course", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const { courseId: otherCourseId } = await seedCourse(env, {

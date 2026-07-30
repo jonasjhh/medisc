@@ -89,7 +89,7 @@ export function PlayerStatsPage() {
             </Typography>
           ) : (
             <>
-              <FormControl size="small" sx={{ minWidth: 220, mb: 2 }}>
+              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
                 <InputLabel id="layout-filter-label">
                   Course &amp; layout
                 </InputLabel>
@@ -100,6 +100,13 @@ export function PlayerStatsPage() {
                   onChange={(event) =>
                     setLayoutId(event.target.value as number)
                   }
+                  sx={{
+                    "& .MuiSelect-select": {
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    },
+                  }}
                 >
                   {layouts.map((layout) => (
                     <MenuItem key={layout.layoutId} value={layout.layoutId}>
@@ -110,7 +117,12 @@ export function PlayerStatsPage() {
               </FormControl>
 
               <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
+                <Table
+                  size="small"
+                  sx={{
+                    "& td, & th": { px: 0.75, py: 0.5, fontSize: "0.8125rem" },
+                  }}
+                >
                   <TableHead>
                     <TableRow>
                       <TableCell>Hole</TableCell>
@@ -119,7 +131,7 @@ export function PlayerStatsPage() {
                       <TableCell align="right">Avg</TableCell>
                       <TableCell align="right">Best</TableCell>
                       <TableCell align="right">Worst</TableCell>
-                      <TableCell align="right">Avg penalties</TableCell>
+                      <TableCell align="right">Avg pen.</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>

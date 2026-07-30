@@ -372,3 +372,24 @@ roundsRoute.post("/:roundId/complete", async (c) => {
   const detail = await buildRoundDetail(c.env.DB, roundId);
   return c.json(detail);
 });
+
+roundsRoute.post("/:roundId/reopen", async (c) => {
+  const roundId = Number(c.req.param("roundId"));
+  if (!Number.isInteger(roundId)) {
+    return c.json({ error: "Invalid round id" }, 400);
+  }
+
+  const round = await c.env.DB.prepare("SELECT id FROM rounds WHERE id = ?")
+    .bind(roundId)
+    .first();
+  if (!round) {
+    return c.json({ error: "Round not found" }, 404);
+  }
+
+  await c.env.DB.prepare("UPDATE rounds SET completed_at = NULL WHERE id = ?")
+    .bind(roundId)
+    .run();
+
+  const detail = await buildRoundDetail(c.env.DB, roundId);
+  return c.json(detail);
+});

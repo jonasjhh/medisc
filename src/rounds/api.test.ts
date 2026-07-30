@@ -4,6 +4,7 @@ import {
   createRound,
   getRound,
   listRounds,
+  reopenRound,
   updateHoleScore,
   updateRound,
 } from "./api";
@@ -82,6 +83,15 @@ describe("rounds api", () => {
     await completeRound(1);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/rounds/1/complete",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("reopens a round", async () => {
+    const fetchMock = mockFetchOnce({ id: 1, completedAt: null });
+    await reopenRound(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rounds/1/reopen",
       expect.objectContaining({ method: "POST" }),
     );
   });

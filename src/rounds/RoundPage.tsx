@@ -15,10 +15,18 @@ import IconButton from "@mui/material/IconButton";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import { listPlayers } from "../players/api";
 import type { Player } from "../players/api";
-import { completeRound, getRound, updateHoleScore, updateRound } from "./api";
+import {
+  completeRound,
+  getRound,
+  reopenRound,
+  updateHoleScore,
+  updateRound,
+} from "./api";
 import type { RoundDetail } from "./api";
 import { ScoreAdjuster } from "./ScoreAdjuster";
 
@@ -34,6 +42,7 @@ export function RoundPage() {
   const [error, setError] = useState<string | null>(null);
   const [holeIndex, setHoleIndex] = useState(0);
   const [finishing, setFinishing] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const [togglingCounting, setTogglingCounting] = useState(false);
 
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
@@ -65,17 +74,12 @@ export function RoundPage() {
     })();
   }, []);
 
-  const adjust = async (scoreId: number, field: Field, delta: number) => {
+  const setScore = async (scoreId: number, field: Field, nextValue: number) => {
     if (!round) {
       return;
     }
     const current = round.scores.find((score) => score.id === scoreId);
-    if (!current) {
-      return;
-    }
-    const floor = field === "strokes" ? 1 : 0;
-    const nextValue = Math.max(floor, current[field] + delta);
-    if (nextValue === current[field]) {
+    if (!current || current[field] === nextValue) {
       return;
     }
 
@@ -94,6 +98,18 @@ export function RoundPage() {
     }
   };
 
+  const adjust = (scoreId: number, field: Field, delta: number) => {
+    if (!round) {
+      return;
+    }
+    const current = round.scores.find((score) => score.id === scoreId);
+    if (!current) {
+      return;
+    }
+    const floor = field === "strokes" ? 1 : 0;
+    return setScore(scoreId, field, Math.max(floor, current[field] + delta));
+  };
+
   const handleFinish = async () => {
     setFinishing(true);
     setError(null);
@@ -104,6 +120,19 @@ export function RoundPage() {
       setError(err instanceof Error ? err.message : "Failed to finish round");
     } finally {
       setFinishing(false);
+    }
+  };
+
+  const handleReopen = async () => {
+    setReopening(true);
+    setError(null);
+    try {
+      const updated = await reopenRound(id);
+      setRound(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reopen round");
+    } finally {
+      setReopening(false);
     }
   };
 
@@ -182,6 +211,8 @@ export function RoundPage() {
   const isFirstHole = holeIndex === 0;
   const isLastHole = holeIndex === round.holes.length - 1;
   const isCompleted = round.completedAt !== null;
+  const birdieValue = Math.max(1, hole.par - 1);
+  const bogeyValue = hole.par + 1;
 
   return (
     <Container maxWidth="sm" sx={{ py: 4 }}>
@@ -193,13 +224,25 @@ export function RoundPage() {
         direction="row"
         justifyContent="space-between"
         alignItems="flex-start"
+        flexWrap="wrap"
+        rowGap={1}
         spacing={2}
       >
         <Typography variant="h5" component="h1" gutterBottom>
           {round.course.name} — {round.layout.name}
         </Typography>
         {isCompleted ? (
-          <Chip label="Completed" color="success" size="small" />
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Chip label="Completed" color="success" size="small" />
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={reopening}
+              onClick={() => void handleReopen()}
+            >
+              Reopen round
+            </Button>
+          </Stack>
         ) : (
           <Button
             variant="outlined"
@@ -322,6 +365,27 @@ export function RoundPage() {
               <Typography variant="subtitle1" fontWeight={600} gutterBottom>
                 {player.name}
               </Typography>
+
+              {!isCompleted && (
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  fullWidth
+                  value={score.strokes}
+                  onChange={(_event, value: number | null) => {
+                    if (value !== null) {
+                      void setScore(score.id, "strokes", value);
+                    }
+                  }}
+                  aria-label={`${player.name} quick score`}
+                  sx={{ mb: 1.5 }}
+                >
+                  <ToggleButton value={birdieValue}>Birdie</ToggleButton>
+                  <ToggleButton value={hole.par}>Par</ToggleButton>
+                  <ToggleButton value={bogeyValue}>Bogey</ToggleButton>
+                </ToggleButtonGroup>
+              )}
+
               <Stack direction="row" spacing={4}>
                 <ScoreAdjuster
                   label="Strokes"

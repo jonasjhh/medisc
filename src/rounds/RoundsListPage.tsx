@@ -83,8 +83,15 @@ export function RoundsListPage() {
         </Button>
       </Stack>
 
-      <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-        <FormControl size="small" sx={{ minWidth: 130 }}>
+      <Stack
+        direction="row"
+        flexWrap="wrap"
+        useFlexGap
+        columnGap={1}
+        rowGap={1}
+        sx={{ mb: 2 }}
+      >
+        <FormControl size="small" sx={{ minWidth: 110, flex: "1 1 110px" }}>
           <InputLabel id="status-filter-label">Status</InputLabel>
           <Select
             labelId="status-filter-label"
@@ -100,7 +107,7 @@ export function RoundsListPage() {
           </Select>
         </FormControl>
 
-        <FormControl size="small" sx={{ minWidth: 130 }}>
+        <FormControl size="small" sx={{ minWidth: 110, flex: "1 1 110px" }}>
           <InputLabel id="player-filter-label">Player</InputLabel>
           <Select
             labelId="player-filter-label"
@@ -119,7 +126,7 @@ export function RoundsListPage() {
           </Select>
         </FormControl>
 
-        <FormControl size="small" sx={{ minWidth: 130 }}>
+        <FormControl size="small" sx={{ minWidth: 110, flex: "1 1 110px" }}>
           <InputLabel id="course-filter-label">Course</InputLabel>
           <Select
             labelId="course-filter-label"
