@@ -19,6 +19,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:worker": "vitest run --config vitest.worker.config.ts",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "worker:dev": "wrangler dev",
@@ -31,13 +32,16 @@
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^6.4.8",
     "@mui/material": "^6.4.8",
+    "hono": "^4.7.4",
     "localforage": "^1.10.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.0",
-    "workbox-window": "^7.3.0"
+    "workbox-window": "^7.3.0",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.0",
     "@cloudflare/workers-types": "^5.20260722.1",
     "@eslint/js": "^9.23.0",
     "@playwright/test": "^1.51.1",

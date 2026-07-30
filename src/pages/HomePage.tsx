@@ -13,7 +13,8 @@ export function HomePage() {
     <Container maxWidth="sm">
       <Box
         sx={{
-          minHeight: "100dvh",
+          minHeight: "calc(100dvh - 64px)",
+          py: 4,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",

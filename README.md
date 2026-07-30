@@ -1,11 +1,19 @@
 # Medisc
 
-A React SPA built as an installable, offline-capable Progressive Web App,
-themed with Material Design 3 via MUI, backed by a Cloudflare Worker + D1
-for server-side data (currently: a visit/score counter). This is still an
-early scaffolding step — the UI is a "Hello, world!" screen plus a small
-visit-tracking demo, proving the pipelines and data flow work end to end
-before real features are built.
+A minimal disc golf scorecard PWA — installable and offline-capable,
+themed with Material Design 3 via MUI, backed by a Cloudflare Worker + D1.
+The goal is a udisc-style scorecard without the bloat.
+
+## Domain model
+
+- **Course** — a physical course, identified by name.
+- **Layout** — a course can have multiple layouts (e.g. "Blue",
+  "Championship"); the same physical hole can have a different par/distance
+  on each one, so holes belong to a layout rather than directly to a course.
+- **Hole** — belongs to a layout: a number, a par, and an optional distance
+  (feet).
+- Rounds, players, and hole-by-hole scoring (score + penalties per player
+  per hole) are the next phase, once course registration is in place.
 
 ## Stack
 
@@ -15,8 +23,10 @@ before real features are built.
 - **localforage** for local data persistence (IndexedDB-backed)
 - **react-router-dom** for client-side routing
 - **pnpm** as the package manager
-- **Cloudflare Workers + D1** for the backend API and database
-- **Vitest + React Testing Library** for unit/component tests
+- **Cloudflare Workers + D1** for the backend API and database, routed with
+  **Hono** and validated with **Zod**
+- **Vitest + React Testing Library** for frontend unit/component tests, and
+  **@cloudflare/vitest-pool-workers** for real Worker + D1 integration tests
 - **Playwright** for end-to-end tests, including a PWA installability check
 - **ESLint + Prettier** for linting/formatting
 - **GitHub Actions** for CI and deployment to **GitHub Pages** (static
@@ -31,36 +41,53 @@ pnpm dev
 
 ## Scripts
 
-| Script                         | Purpose                                      |
-| ------------------------------ | -------------------------------------------- |
-| `pnpm dev`                     | Start the Vite dev server                    |
-| `pnpm build`                   | Type-check and build for production          |
-| `pnpm preview`                 | Preview the production build locally         |
-| `pnpm lint`                    | Run ESLint                                   |
-| `pnpm format` / `format:check` | Run/check Prettier formatting                |
-| `pnpm typecheck`               | Run the TypeScript compiler with no emit     |
-| `pnpm test`                    | Run unit tests once                          |
-| `pnpm test:watch`              | Run unit tests in watch mode                 |
-| `pnpm test:coverage`           | Run unit tests with coverage                 |
-| `pnpm e2e`                     | Build, preview, and run Playwright e2e tests |
-| `pnpm worker:dev`              | Run the Worker locally with `wrangler dev`   |
-| `pnpm worker:deploy`           | Build the frontend and deploy the Worker     |
-| `pnpm db:migrate:local`        | Apply migrations to the local D1 emulator    |
-| `pnpm db:migrate:remote`       | Apply migrations to the real D1 database     |
+| Script                         | Purpose                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------ |
+| `pnpm dev`                     | Start the Vite dev server                                                      |
+| `pnpm build`                   | Type-check and build for production                                            |
+| `pnpm preview`                 | Preview the production build locally                                           |
+| `pnpm lint`                    | Run ESLint                                                                     |
+| `pnpm format` / `format:check` | Run/check Prettier formatting                                                  |
+| `pnpm typecheck`               | Run the TypeScript compiler with no emit                                       |
+| `pnpm test`                    | Run frontend unit tests once                                                   |
+| `pnpm test:watch`              | Run frontend unit tests in watch mode                                          |
+| `pnpm test:coverage`           | Run frontend unit tests with coverage                                          |
+| `pnpm test:worker`             | Run Worker API tests against a real D1 (via `@cloudflare/vitest-pool-workers`) |
+| `pnpm e2e`                     | Build, preview, and run Playwright e2e tests                                   |
+| `pnpm worker:dev`              | Run the Worker locally with `wrangler dev`                                     |
+| `pnpm worker:deploy`           | Build the frontend and deploy the Worker                                       |
+| `pnpm db:migrate:local`        | Apply migrations to the local D1 emulator                                      |
+| `pnpm db:migrate:remote`       | Apply migrations to the real D1 database                                       |
 
 ## Backend (Cloudflare Worker + D1)
 
-`worker/index.ts` implements the API, backed by the D1 database bound as
-`DB` in `wrangler.toml`:
+`worker/index.ts` assembles a Hono app from `worker/routes/`, backed by the
+D1 database bound as `DB` in `wrangler.toml`:
+
+**Courses** (`worker/routes/courses.ts`)
+
+- `POST /api/courses` — body `{ name }` → creates a course.
+- `GET /api/courses` — lists courses with their layout count.
+- `GET /api/courses/:courseId` — a course with its layouts, each with its
+  holes, nested.
+- `POST /api/courses/:courseId/layouts` — body `{ name }` → adds a layout.
+
+**Layouts** (`worker/routes/layouts.ts`)
+
+- `POST /api/layouts/:layoutId/holes` — body
+  `{ number, par, distanceFeet? }` → adds a hole to that layout. Rejects a
+  duplicate hole `number` on the same layout with `409`.
+
+**Scores** (`worker/routes/scores.ts`) — the original visit-counter demo
+from the "Hello, world!" page, unrelated to disc golf scoring:
 
 - `POST /api/scores` — body `{ userId, score }`, inserts one row into the
   `scores` table and returns `{ totalVisits, yourVisits }`.
 - `GET /api/scores/top?limit=10` — returns the leaderboard, scores summed
   per `userId`.
 
-The frontend (`src/scores/`) calls this on every page load: it assigns each
-browser a random persisted `userId` (via `localforage`), records a visit,
-and shows both the visitor's own count and the site-wide total.
+The course-registration frontend lives in `src/courses/`; visit it at
+`/courses` in the app.
 
 `wrangler.toml` also serves the built frontend (`dist/`) as static assets,
 so the Worker is the single deployable that hosts both the API and the app.
@@ -109,5 +136,5 @@ In the repository settings, set **Settings → Pages → Source** to
 **GitHub Actions**.
 
 Every push and pull request also runs `.github/workflows/ci.yml`: lint,
-format check, typecheck, unit tests with coverage, and a headless Playwright
-run.
+format check, typecheck, frontend unit tests with coverage, Worker API
+tests, and a headless Playwright run.
