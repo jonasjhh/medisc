@@ -118,7 +118,33 @@ pnpm dev                # terminal 2
 
 ### Deploying
 
+Pushing to `main` triggers `.github/workflows/deploy-worker.yml`, which
+builds the frontend, applies any pending D1 migrations against the real
+database, then deploys the Worker — all via
+[`cloudflare/wrangler-action`](https://github.com/cloudflare/wrangler-action).
+Since `wrangler d1 migrations apply` only applies migrations D1 hasn't
+already recorded, this is safe to run on every deploy and keeps the schema
+in sync automatically as new migration files are added.
+
+This needs two repository secrets (**Settings → Secrets and variables →
+Actions**):
+
+- `CLOUDFLARE_API_TOKEN` — create one at
+  **My Profile → API Tokens → Create Token**, using the "Edit Cloudflare
+  Workers" template (it covers Workers Scripts and D1).
+- `CLOUDFLARE_ACCOUNT_ID` — shown in the Cloudflare dashboard sidebar, or
+  in the URL when viewing your account (`dash.cloudflare.com/<account-id>/…`).
+
+If you'd connected the GitHub repo directly in **Workers & Pages** for
+Cloudflare's own Git-integration deploys, disconnect that (Settings →
+Build & deployments) so it doesn't fight with this workflow — the
+auto-detected build command there also can't run D1 migrations, only
+build + deploy the Worker script itself.
+
+To deploy manually instead (e.g. from your own machine):
+
 ```bash
+pnpm db:migrate:remote
 pnpm worker:deploy
 ```
 
