@@ -3,6 +3,7 @@ import Chip from "@mui/material/Chip";
 import Container from "@mui/material/Container";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { ScoreBoard } from "../scores/ScoreBoard";
 import { useVisitCount } from "../storage/useVisitCount";
 
 export function HomePage() {
@@ -42,6 +43,7 @@ export function HomePage() {
             Stored locally with localforage — visit #{visitCount}
           </Typography>
         )}
+        <ScoreBoard />
       </Box>
     </Container>
   );

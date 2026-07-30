@@ -1,0 +1,19 @@
+name = "medisc"
+main = "worker/index.ts"
+compatibility_date = "2024-09-23"
+
+# Serves the Vite build output; the Worker only runs for requests that don't
+# match a built asset (see run_worker_first), i.e. our /api/* routes, and the
+# SPA fallback lets client-side routing work for unknown paths.
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+run_worker_first = true
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "medisc"
+# Replace with the id printed by `wrangler d1 create medisc`.
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+migrations_dir = "migrations"

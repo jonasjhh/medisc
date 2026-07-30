@@ -13,6 +13,7 @@ export default tseslint.config(
       "playwright-report",
       "test-results",
       "dev-dist",
+      ".wrangler",
     ],
   },
   {
@@ -38,6 +39,12 @@ export default tseslint.config(
     files: ["e2e/**/*.ts", "playwright.config.ts"],
     languageOptions: {
       globals: globals.node,
+    },
+  },
+  {
+    files: ["worker/**/*.ts"],
+    languageOptions: {
+      globals: globals.serviceworker,
     },
   },
   eslintConfigPrettier,

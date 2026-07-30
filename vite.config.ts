@@ -9,6 +9,13 @@ const base = process.env.GITHUB_PAGES === "true" ? "/medisc/" : "/";
 
 export default defineConfig({
   base,
+  server: {
+    // Forwards API calls to `wrangler dev` (run alongside `pnpm dev`) so the
+    // frontend can talk to the Worker/D1 backend during local development.
+    proxy: {
+      "/api": "http://localhost:8787",
+    },
+  },
   plugins: [
     react(),
     VitePWA({
