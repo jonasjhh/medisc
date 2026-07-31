@@ -406,6 +406,7 @@ describe("player stats", () => {
     layoutId: number,
     playerId: number,
     strokes: number,
+    options?: { counting?: boolean },
   ) {
     const round = await json<{
       id: number;
@@ -422,6 +423,13 @@ describe("player stats", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ strokes }),
     });
+    if (options?.counting === false) {
+      await request(`/api/rounds/${round.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ counting: false }),
+      });
+    }
     await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
   }
 
@@ -494,6 +502,29 @@ describe("player stats", () => {
         par: 3,
       },
     ]);
+  });
+
+  it("excludes non-counting rounds from both stats and the layouts list", async () => {
+    const { courseId, layoutId } = await setUpCourseWithOneHole();
+    const player = await json<{ id: number }>(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+    );
+
+    await playRound(courseId, layoutId, player.id, 4, { counting: false });
+
+    const { layouts } = await json<{ layouts: unknown[] }>(
+      await request(`/api/players/${player.id}/layouts`),
+    );
+    expect(layouts).toHaveLength(0);
+
+    const { holes } = await json<{ holes: unknown[] }>(
+      await request(`/api/players/${player.id}/stats?layoutId=${layoutId}`),
+    );
+    expect(holes).toHaveLength(0);
   });
 
   it("404s for a player that doesn't exist", async () => {

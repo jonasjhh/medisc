@@ -191,7 +191,9 @@ playersRoute.get("/:playerId/layouts", async (c) => {
      JOIN round_players ON round_players.round_id = rounds.id
      JOIN courses ON courses.id = rounds.course_id
      JOIN layouts ON layouts.id = rounds.layout_id
-     WHERE round_players.player_id = ? AND rounds.completed_at IS NOT NULL
+     WHERE round_players.player_id = ?
+       AND rounds.completed_at IS NOT NULL
+       AND rounds.counting = 1
      ORDER BY courses.name, layouts.name`,
   )
     .bind(playerId)
@@ -238,6 +240,7 @@ playersRoute.get("/:playerId/stats", async (c) => {
      WHERE hole_scores.player_id = ?
        AND rounds.layout_id = ?
        AND rounds.completed_at IS NOT NULL
+       AND rounds.counting = 1
      GROUP BY holes.id
      ORDER BY holes.number`,
   )

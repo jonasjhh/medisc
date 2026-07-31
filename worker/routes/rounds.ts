@@ -345,6 +345,12 @@ roundsRoute.patch("/:roundId", async (c) => {
   }
 
   if (counting !== undefined) {
+    if (round.completed_at) {
+      return c.json(
+        { error: "Cannot change counting on a completed round" },
+        409,
+      );
+    }
     await c.env.DB.prepare("UPDATE rounds SET counting = ? WHERE id = ?")
       .bind(counting ? 1 : 0, roundId)
       .run();

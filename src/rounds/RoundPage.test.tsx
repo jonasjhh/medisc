@@ -238,6 +238,19 @@ describe("RoundPage", () => {
     ).not.toBeChecked();
   });
 
+  it("disables the counting toggle on a completed round", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+    });
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    expect(
+      screen.getByRole("checkbox", { name: /counting round/i }),
+    ).toBeDisabled();
+  });
+
   it("swaps which players are in the round", async () => {
     vi.mocked(roundsApi.updateRound).mockResolvedValue({
       ...baseRound,

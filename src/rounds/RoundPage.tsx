@@ -433,17 +433,21 @@ export function RoundPage() {
         )}
       </Stack>
 
-      <FormControlLabel
-        sx={{ mb: 2 }}
-        control={
-          <Switch
-            checked={round.counting}
-            disabled={togglingCounting}
-            onChange={() => void handleToggleCounting()}
+      <Tooltip title={isCompleted ? "Reopen the round to change this" : ""}>
+        <span>
+          <FormControlLabel
+            sx={{ mb: 2 }}
+            control={
+              <Switch
+                checked={round.counting}
+                disabled={togglingCounting || isCompleted}
+                onChange={() => void handleToggleCounting()}
+              />
+            }
+            label="Counting round"
           />
-        }
-        label="Counting round"
-      />
+        </span>
+      </Tooltip>
 
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Stack

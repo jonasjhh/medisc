@@ -373,7 +373,7 @@ describe("rounds API", () => {
     expect(res.status).toBe(409);
   });
 
-  it("toggles the counting flag, even on a completed round", async () => {
+  it("409s when toggling the counting flag on a completed round", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
     const round = await json<{ id: number }>(
@@ -384,6 +384,27 @@ describe("rounds API", () => {
       }),
     );
     await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
+
+    const res = await request(`/api/rounds/${round.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ counting: false }),
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("toggles the counting flag once a completed round is reopened", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const round = await json<{ id: number }>(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+    );
+    await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
+    await request(`/api/rounds/${round.id}/reopen`, { method: "POST" });
 
     const res = await request(`/api/rounds/${round.id}`, {
       method: "PATCH",
