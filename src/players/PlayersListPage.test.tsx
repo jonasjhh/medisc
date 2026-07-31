@@ -282,4 +282,67 @@ describe("PlayersListPage", () => {
     await screen.findByText("Alice");
     expect(screen.getByRole("button", { name: /edit alice/i })).toBeEnabled();
   });
+
+  it("shows a Guest pill for an unclaimed player", async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: null,
+        },
+      ],
+    });
+
+    renderPage();
+
+    await screen.findByText("Alice");
+    expect(screen.getByText("Guest")).toBeInTheDocument();
+  });
+
+  it("shows a Claimed pill for a player claimed by someone else", async () => {
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({
+      user: { id: 1, createdAt: "", claimedPlayer: null },
+    });
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: 5,
+        },
+      ],
+    });
+
+    renderPage();
+
+    await screen.findByText("Alice");
+    expect(screen.getByText("Claimed")).toBeInTheDocument();
+  });
+
+  it("shows a You pill for the current user's claimed player", async () => {
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({
+      user: { id: 5, createdAt: "", claimedPlayer: { id: 1, name: "Alice" } },
+    });
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: 5,
+        },
+      ],
+    });
+
+    renderPage();
+
+    await screen.findByText("Alice");
+    expect(screen.getByText("You")).toBeInTheDocument();
+  });
 });

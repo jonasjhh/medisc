@@ -7,6 +7,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
 import Dialog from "@mui/material/Dialog";
@@ -20,6 +21,7 @@ import ListItem from "@mui/material/ListItem";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
 import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
@@ -83,6 +85,20 @@ export function PlayersListPage() {
 
   const canEdit = (player: Player) =>
     player.claimedByUserId === null || player.claimedByUserId === user?.id;
+
+  const statusChip = (player: Player) => {
+    const isMine = player.claimedByUserId === user?.id;
+    return (
+      <Chip
+        size="small"
+        label={
+          isMine ? "You" : player.claimedByUserId !== null ? "Claimed" : "Guest"
+        }
+        color={isMine ? "primary" : "default"}
+        variant={isMine ? "filled" : "outlined"}
+      />
+    );
+  };
 
   const handlePlayerAdded = (player: Player) => {
     setPlayers((prev) =>
@@ -214,7 +230,14 @@ export function PlayersListPage() {
                   to={`/players/${player.id}`}
                   sx={{ pr: 12 }}
                 >
-                  <ListItemText primary={player.name} />
+                  <ListItemText
+                    primary={
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <span>{player.name}</span>
+                        {statusChip(player)}
+                      </Stack>
+                    }
+                  />
                 </ListItemButton>
               )}
             </ListItem>
