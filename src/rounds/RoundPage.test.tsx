@@ -501,4 +501,21 @@ describe("RoundPage", () => {
     expect(await screen.findByText("4")).toBeInTheDocument();
     expect(screen.queryByText("-")).not.toBeInTheDocument();
   });
+
+  it("shows no quick-score button pressed for an unrecorded hole, and registers a par in one click", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue(twelveHoleRound);
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    const parButton = screen.getByRole("button", { name: "Par" });
+    expect(parButton).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(parButton);
+
+    expect(parButton).toHaveAttribute("aria-pressed", "true");
+    expect(roundsApi.updateHoleScore).toHaveBeenCalledWith(3000, {
+      strokes: 3,
+    });
+  });
 });

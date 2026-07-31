@@ -216,7 +216,7 @@ export function RoundPage() {
       return;
     }
     const current = round.scores.find((score) => score.id === scoreId);
-    if (!current || current[field] === nextValue) {
+    if (!current || (current.recorded && current[field] === nextValue)) {
       return;
     }
 
@@ -661,7 +661,7 @@ export function RoundPage() {
                     exclusive
                     size="small"
                     fullWidth
-                    value={score.strokes}
+                    value={score.recorded ? score.strokes : null}
                     onChange={(_event, value: number | null) => {
                       if (value !== null) {
                         void setScore(score.id, "strokes", value);
