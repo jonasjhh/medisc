@@ -1,5 +1,6 @@
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -22,7 +23,6 @@ function HoleGroupTable({
       size="small"
       aria-label={caption}
       sx={{
-        width: "auto",
         "& td, & th": { px: 0.75, py: 0.25, fontSize: "0.8125rem" },
       }}
     >
@@ -72,22 +72,16 @@ export function LayoutCard({ layout }: { layout: Layout }) {
       </Typography>
 
       {groups.length > 0 ? (
-        <Box
-          sx={{
-            display: "flex",
-            columnGap: 1,
-            rowGap: 1,
-            overflowX: "auto",
-          }}
-        >
+        <Stack spacing={1.5}>
           {groups.map((holes) => (
-            <HoleGroupTable
-              key={holes[0].id}
-              holes={holes}
-              caption={`${layout.name}, holes ${holes[0].number}–${holes[holes.length - 1].number}`}
-            />
+            <Box key={holes[0].id} sx={{ overflowX: "auto" }}>
+              <HoleGroupTable
+                holes={holes}
+                caption={`${layout.name}, holes ${holes[0].number}–${holes[holes.length - 1].number}`}
+              />
+            </Box>
           ))}
-        </Box>
+        </Stack>
       ) : (
         <Typography variant="body2" color="text.secondary">
           No holes yet.
