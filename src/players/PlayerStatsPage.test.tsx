@@ -6,6 +6,7 @@ import { PlayerStatsPage } from "./PlayerStatsPage";
 import * as playersApi from "./api";
 import { IdentityProvider } from "../identity/IdentityContext";
 import * as identityApi from "../identity/api";
+import { InstallPromptProvider } from "../app/InstallPromptContext";
 
 vi.mock("./api");
 vi.mock("../identity/api");
@@ -13,11 +14,13 @@ vi.mock("../identity/api");
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/players/1"]}>
-      <IdentityProvider>
-        <Routes>
-          <Route path="/players/:playerId" element={<PlayerStatsPage />} />
-        </Routes>
-      </IdentityProvider>
+      <InstallPromptProvider>
+        <IdentityProvider>
+          <Routes>
+            <Route path="/players/:playerId" element={<PlayerStatsPage />} />
+          </Routes>
+        </IdentityProvider>
+      </InstallPromptProvider>
     </MemoryRouter>,
   );
 }

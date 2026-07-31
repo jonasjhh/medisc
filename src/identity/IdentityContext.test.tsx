@@ -1,10 +1,26 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { IdentityProvider, useIdentity } from "./IdentityContext";
 import * as identityApi from "./api";
+import { InstallPromptProvider } from "../app/InstallPromptContext";
 
 vi.mock("./api");
+
+function dispatchBeforeInstallPrompt() {
+  const event = new Event("beforeinstallprompt", {
+    cancelable: true,
+  }) as Event & {
+    prompt: () => Promise<void>;
+    userChoice: Promise<{ outcome: string; platform: string }>;
+  };
+  event.prompt = vi.fn().mockResolvedValue(undefined);
+  event.userChoice = Promise.resolve({ outcome: "accepted", platform: "web" });
+  act(() => {
+    window.dispatchEvent(event);
+  });
+  return event;
+}
 
 function Consumer() {
   const { status, user, isOnboardingOpen, closeOnboarding } = useIdentity();
@@ -20,9 +36,11 @@ function Consumer() {
 
 function renderConsumer() {
   return render(
-    <IdentityProvider>
-      <Consumer />
-    </IdentityProvider>,
+    <InstallPromptProvider>
+      <IdentityProvider>
+        <Consumer />
+      </IdentityProvider>
+    </InstallPromptProvider>,
   );
 }
 
@@ -83,5 +101,32 @@ describe("IdentityContext", () => {
 
     expect(localStorage.getItem("medisc-welcome-dismissed")).toBe("1");
     expect(screen.getByTestId("onboarding-open")).toHaveTextContent("false");
+  });
+
+  it("does not auto-open onboarding while an install prompt is pending", async () => {
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({ user: null });
+    renderConsumer();
+    dispatchBeforeInstallPrompt();
+
+    await screen.findByTestId("status");
+    expect(screen.getByTestId("status")).toHaveTextContent("ready");
+    expect(screen.getByTestId("onboarding-open")).toHaveTextContent("false");
+  });
+
+  it("auto-opens onboarding once the install prompt is resolved", async () => {
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({ user: null });
+    renderConsumer();
+    dispatchBeforeInstallPrompt();
+
+    await screen.findByTestId("status");
+    expect(screen.getByTestId("onboarding-open")).toHaveTextContent("false");
+
+    act(() => {
+      window.dispatchEvent(new Event("appinstalled"));
+    });
+
+    expect(await screen.findByTestId("onboarding-open")).toHaveTextContent(
+      "true",
+    );
   });
 });

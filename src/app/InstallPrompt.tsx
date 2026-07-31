@@ -1,16 +1,14 @@
-import { useState } from "react";
 import CloseIcon from "@mui/icons-material/Close";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import Snackbar from "@mui/material/Snackbar";
-import { useInstallPrompt } from "./useInstallPrompt";
+import { useInstallPromptContext } from "./InstallPromptContext";
 
 export function InstallPrompt() {
-  const { canInstall, promptInstall } = useInstallPrompt();
-  const [dismissed, setDismissed] = useState(false);
+  const { canInstall, promptInstall, dismiss } = useInstallPromptContext();
 
-  if (!canInstall || dismissed) {
+  if (!canInstall) {
     return null;
   }
 
@@ -31,7 +29,7 @@ export function InstallPrompt() {
               size="small"
               color="inherit"
               aria-label="close"
-              onClick={() => setDismissed(true)}
+              onClick={dismiss}
             >
               <CloseIcon fontSize="small" />
             </IconButton>

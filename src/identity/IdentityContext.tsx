@@ -8,6 +8,7 @@ import {
 } from "react";
 import { getCurrentUser } from "./api";
 import type { IdentityUser } from "./api";
+import { useInstallPromptContext } from "../app/InstallPromptContext";
 
 const DISMISSED_KEY = "medisc-welcome-dismissed";
 
@@ -26,6 +27,7 @@ interface IdentityContextValue {
 const IdentityContext = createContext<IdentityContextValue | null>(null);
 
 export function IdentityProvider({ children }: { children: ReactNode }) {
+  const { canInstall } = useInstallPromptContext();
   const [status, setStatus] = useState<"loading" | "ready">("loading");
   const [user, setUser] = useState<IdentityUser | null>(null);
   // Distinguishes "the server confirmed there's no user yet" from "we
@@ -55,11 +57,16 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (status !== "ready" || user !== null || fetchFailed) return;
+    // Defer to the install prompt when it's on offer — never show both
+    // first-run overlays at once. Once it's dismissed or acted on,
+    // `canInstall` flips to false and this effect re-runs.
+    if (status !== "ready" || user !== null || fetchFailed || canInstall) {
+      return;
+    }
     if (localStorage.getItem(DISMISSED_KEY)) return;
     setOnboardingStep("welcome");
     setIsOnboardingOpen(true);
-  }, [status, user, fetchFailed]);
+  }, [status, user, fetchFailed, canInstall]);
 
   const closeOnboarding = () => {
     localStorage.setItem(DISMISSED_KEY, "1");

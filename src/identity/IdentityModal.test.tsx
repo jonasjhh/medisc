@@ -5,6 +5,7 @@ import { IdentityModal } from "./IdentityModal";
 import { IdentityProvider, useIdentity } from "./IdentityContext";
 import * as identityApi from "./api";
 import * as playersApi from "../players/api";
+import { InstallPromptProvider } from "../app/InstallPromptContext";
 
 vi.mock("./api");
 vi.mock("../players/api");
@@ -16,10 +17,12 @@ function OpenOnboardingButton({ step }: { step?: "welcome" | "claim" }) {
 
 function renderModal(step?: "welcome" | "claim") {
   return render(
-    <IdentityProvider>
-      <OpenOnboardingButton step={step} />
-      <IdentityModal />
-    </IdentityProvider>,
+    <InstallPromptProvider>
+      <IdentityProvider>
+        <OpenOnboardingButton step={step} />
+        <IdentityModal />
+      </IdentityProvider>
+    </InstallPromptProvider>,
   );
 }
 

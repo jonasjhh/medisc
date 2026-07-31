@@ -2,6 +2,15 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { InstallPrompt } from "./InstallPrompt";
+import { InstallPromptProvider } from "./InstallPromptContext";
+
+function renderInstallPrompt() {
+  return render(
+    <InstallPromptProvider>
+      <InstallPrompt />
+    </InstallPromptProvider>,
+  );
+}
 
 function dispatchBeforeInstallPrompt() {
   const event = new Event("beforeinstallprompt", {
@@ -20,7 +29,7 @@ function dispatchBeforeInstallPrompt() {
 
 describe("InstallPrompt", () => {
   it("renders nothing until beforeinstallprompt fires", () => {
-    render(<InstallPrompt />);
+    renderInstallPrompt();
     expect(
       screen.queryByRole("button", { name: /install/i }),
     ).not.toBeInTheDocument();
@@ -28,7 +37,7 @@ describe("InstallPrompt", () => {
 
   it("shows an Install button once captured, and triggers the native prompt on click", async () => {
     const user = userEvent.setup();
-    render(<InstallPrompt />);
+    renderInstallPrompt();
 
     const event = dispatchBeforeInstallPrompt();
 
@@ -39,7 +48,7 @@ describe("InstallPrompt", () => {
   });
 
   it("hides once the app is installed", async () => {
-    render(<InstallPrompt />);
+    renderInstallPrompt();
     dispatchBeforeInstallPrompt();
     await screen.findByRole("button", { name: /install/i });
 
@@ -56,7 +65,7 @@ describe("InstallPrompt", () => {
 
   it("hides when dismissed via the alert's close action", async () => {
     const user = userEvent.setup();
-    render(<InstallPrompt />);
+    renderInstallPrompt();
     dispatchBeforeInstallPrompt();
     await screen.findByRole("button", { name: /install/i });
 

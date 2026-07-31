@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 // Not yet part of lib.dom.d.ts; supported by Chromium-based browsers.
 interface BeforeInstallPromptEvent extends Event {
@@ -16,18 +24,32 @@ declare global {
   }
 }
 
+interface InstallPromptContextValue {
+  canInstall: boolean;
+  promptInstall: () => Promise<void>;
+  dismiss: () => void;
+}
+
+const InstallPromptContext = createContext<InstallPromptContextValue | null>(
+  null,
+);
+
 // Captures the browser's install prompt so it can be triggered from our own
 // UI instead of the browser's default mini-infobar. The event can only be
 // used once, so it's cleared after prompting (accepted or not) and if the
-// app gets installed some other way in the meantime.
-export function useInstallPrompt() {
+// app gets installed some other way in the meantime. Shared via context
+// (rather than a plain hook) so other first-run UI — namely the identity
+// onboarding modal — can defer to it instead of competing for attention.
+export function InstallPromptProvider({ children }: { children: ReactNode }) {
   const [deferredEvent, setDeferredEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (event: BeforeInstallPromptEvent) => {
       event.preventDefault();
       setDeferredEvent(event);
+      setDismissed(false);
     };
     const handleAppInstalled = () => setDeferredEvent(null);
 
@@ -51,5 +73,28 @@ export function useInstallPrompt() {
     setDeferredEvent(null);
   }, [deferredEvent]);
 
-  return { canInstall: deferredEvent !== null, promptInstall };
+  const dismiss = useCallback(() => setDismissed(true), []);
+
+  const canInstall = deferredEvent !== null && !dismissed;
+
+  const value = useMemo(
+    () => ({ canInstall, promptInstall, dismiss }),
+    [canInstall, promptInstall, dismiss],
+  );
+
+  return (
+    <InstallPromptContext.Provider value={value}>
+      {children}
+    </InstallPromptContext.Provider>
+  );
+}
+
+export function useInstallPromptContext(): InstallPromptContextValue {
+  const context = useContext(InstallPromptContext);
+  if (!context) {
+    throw new Error(
+      "useInstallPromptContext must be used within an InstallPromptProvider",
+    );
+  }
+  return context;
 }

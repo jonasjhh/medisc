@@ -5,6 +5,7 @@ import { ThemeProvider } from "@mui/material/styles";
 import { App } from "./App";
 import { createAppTheme } from "./app/theme";
 import { ThemeModeProvider, useThemeMode } from "./app/ThemeModeContext";
+import { InstallPromptProvider } from "./app/InstallPromptContext";
 import { IdentityProvider } from "./identity/IdentityContext";
 
 function ThemedApp() {
@@ -20,9 +21,11 @@ function ThemedApp() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeModeProvider>
-      <IdentityProvider>
-        <ThemedApp />
-      </IdentityProvider>
+      <InstallPromptProvider>
+        <IdentityProvider>
+          <ThemedApp />
+        </IdentityProvider>
+      </InstallPromptProvider>
     </ThemeModeProvider>
   </StrictMode>,
 );
