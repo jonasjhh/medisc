@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink, useParams } from "react-router-dom";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
+import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -18,12 +20,14 @@ import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import { getPlayerLayouts, getPlayerStats, listPlayers } from "./api";
 import type { HoleStat, Player, PlayedLayout } from "./api";
+import { useIdentity } from "../identity/IdentityContext";
 
 type Status = "loading" | "ready" | "error";
 
 export function PlayerStatsPage() {
   const { playerId } = useParams();
   const id = Number(playerId);
+  const { user } = useIdentity();
 
   const [player, setPlayer] = useState<Player | null>(null);
   const [layouts, setLayouts] = useState<PlayedLayout[]>([]);
@@ -79,9 +83,29 @@ export function PlayerStatsPage() {
 
       {status === "ready" && (
         <>
-          <Typography variant="h4" component="h1" gutterBottom>
-            {player?.name ?? "Player"}
-          </Typography>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+            <Typography variant="h4" component="h1">
+              {player?.name ?? "Player"}
+            </Typography>
+            {player && (
+              <Chip
+                size="small"
+                label={
+                  player.claimedByUserId === user?.id
+                    ? "You"
+                    : player.claimedByUserId !== null
+                      ? "Claimed"
+                      : "Guest"
+                }
+                color={
+                  player.claimedByUserId === user?.id ? "primary" : "default"
+                }
+                variant={
+                  player.claimedByUserId === user?.id ? "filled" : "outlined"
+                }
+              />
+            )}
+          </Stack>
 
           {layouts.length === 0 ? (
             <Typography color="text.secondary">

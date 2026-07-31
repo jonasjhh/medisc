@@ -4,12 +4,26 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PlayersListPage } from "./PlayersListPage";
 import * as playersApi from "./api";
+import { IdentityProvider } from "../identity/IdentityContext";
+import * as identityApi from "../identity/api";
 
 vi.mock("./api");
+vi.mock("../identity/api");
+
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <IdentityProvider>
+        <PlayersListPage />
+      </IdentityProvider>
+    </MemoryRouter>,
+  );
+}
 
 describe("PlayersListPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({ user: null });
   });
 
   it("lists existing players", async () => {
@@ -25,11 +39,7 @@ describe("PlayersListPage", () => {
       ],
     });
 
-    render(
-      <MemoryRouter>
-        <PlayersListPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
     expect(await screen.findByText("Alice")).toBeInTheDocument();
   });
@@ -55,11 +65,7 @@ describe("PlayersListPage", () => {
     });
     const user = userEvent.setup();
 
-    render(
-      <MemoryRouter>
-        <PlayersListPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
     await screen.findByText("Alice");
     await user.type(screen.getByLabelText(/add player/i), "Bob");
@@ -90,11 +96,7 @@ describe("PlayersListPage", () => {
     });
     const user = userEvent.setup();
 
-    render(
-      <MemoryRouter>
-        <PlayersListPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
     await screen.findByText("Alice");
     await user.click(screen.getByRole("button", { name: /edit alice/i }));
@@ -122,11 +124,7 @@ describe("PlayersListPage", () => {
     });
     const user = userEvent.setup();
 
-    render(
-      <MemoryRouter>
-        <PlayersListPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
     await screen.findByText("Alice");
     await user.click(screen.getByRole("button", { name: /edit alice/i }));
@@ -139,11 +137,7 @@ describe("PlayersListPage", () => {
   it("shows an empty state", async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue({ players: [] });
 
-    render(
-      <MemoryRouter>
-        <PlayersListPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
     expect(await screen.findByText(/no players yet/i)).toBeInTheDocument();
   });
@@ -163,11 +157,7 @@ describe("PlayersListPage", () => {
     vi.mocked(playersApi.deletePlayer).mockResolvedValue(undefined);
     const user = userEvent.setup();
 
-    render(
-      <MemoryRouter>
-        <PlayersListPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
     await screen.findByText("Alice");
     await user.click(screen.getByRole("button", { name: /delete alice/i }));
@@ -195,11 +185,7 @@ describe("PlayersListPage", () => {
     });
     const user = userEvent.setup();
 
-    render(
-      <MemoryRouter>
-        <PlayersListPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
     await screen.findByText("Alice");
     await user.click(screen.getByRole("button", { name: /delete alice/i }));
@@ -224,11 +210,7 @@ describe("PlayersListPage", () => {
       ],
     });
 
-    render(
-      <MemoryRouter>
-        <PlayersListPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
     await screen.findByText("Alice");
     expect(
@@ -249,15 +231,55 @@ describe("PlayersListPage", () => {
       ],
     });
 
-    render(
-      <MemoryRouter>
-        <PlayersListPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
     await screen.findByText("Alice");
     expect(
       screen.getByRole("button", { name: /delete alice/i }),
     ).toBeDisabled();
+  });
+
+  it("disables editing a player claimed by someone else", async () => {
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({
+      user: { id: 1, createdAt: "", claimedPlayer: null },
+    });
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: 5,
+        },
+      ],
+    });
+
+    renderPage();
+
+    await screen.findByText("Alice");
+    expect(screen.getByRole("button", { name: /edit alice/i })).toBeDisabled();
+  });
+
+  it("allows editing a player claimed by the current user", async () => {
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({
+      user: { id: 5, createdAt: "", claimedPlayer: { id: 1, name: "Alice" } },
+    });
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: 5,
+        },
+      ],
+    });
+
+    renderPage();
+
+    await screen.findByText("Alice");
+    expect(screen.getByRole("button", { name: /edit alice/i })).toBeEnabled();
   });
 });

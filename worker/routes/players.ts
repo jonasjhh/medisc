@@ -104,11 +104,23 @@ playersRoute.patch("/:playerId", async (c) => {
     return c.json({ error: parsed.error.flatten() }, 400);
   }
 
-  const existing = await c.env.DB.prepare("SELECT id FROM players WHERE id = ?")
+  const existing = await c.env.DB.prepare(
+    "SELECT id, claimed_by_user_id FROM players WHERE id = ?",
+  )
     .bind(playerId)
-    .first();
+    .first<{ id: number; claimed_by_user_id: number | null }>();
   if (!existing) {
     return c.json({ error: "Player not found" }, 404);
+  }
+
+  if (
+    existing.claimed_by_user_id !== null &&
+    existing.claimed_by_user_id !== c.get("userId")
+  ) {
+    return c.json(
+      { error: "Only the player who claimed this profile can edit it" },
+      403,
+    );
   }
 
   const row = await c.env.DB.prepare(

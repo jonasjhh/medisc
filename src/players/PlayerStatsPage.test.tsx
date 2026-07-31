@@ -4,21 +4,28 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PlayerStatsPage } from "./PlayerStatsPage";
 import * as playersApi from "./api";
+import { IdentityProvider } from "../identity/IdentityContext";
+import * as identityApi from "../identity/api";
 
 vi.mock("./api");
+vi.mock("../identity/api");
 
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/players/1"]}>
-      <Routes>
-        <Route path="/players/:playerId" element={<PlayerStatsPage />} />
-      </Routes>
+      <IdentityProvider>
+        <Routes>
+          <Route path="/players/:playerId" element={<PlayerStatsPage />} />
+        </Routes>
+      </IdentityProvider>
     </MemoryRouter>,
   );
 }
 
 describe("PlayerStatsPage", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({ user: null });
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
       players: [
         {
@@ -41,6 +48,61 @@ describe("PlayerStatsPage", () => {
     expect(
       await screen.findByText(/no completed rounds yet/i),
     ).toBeInTheDocument();
+  });
+
+  it("shows a Guest pill for an unclaimed player", async () => {
+    vi.mocked(playersApi.getPlayerLayouts).mockResolvedValue({ layouts: [] });
+
+    renderPage();
+
+    await screen.findByText("Alice");
+    expect(await screen.findByText("Guest")).toBeInTheDocument();
+  });
+
+  it("shows a Claimed pill for a player claimed by someone else", async () => {
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({
+      user: { id: 1, createdAt: "", claimedPlayer: null },
+    });
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 1,
+          claimedByUserId: 5,
+        },
+      ],
+    });
+    vi.mocked(playersApi.getPlayerLayouts).mockResolvedValue({ layouts: [] });
+
+    renderPage();
+
+    await screen.findByText("Alice");
+    expect(await screen.findByText("Claimed")).toBeInTheDocument();
+  });
+
+  it("shows a You pill for the current user's claimed player", async () => {
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({
+      user: { id: 5, createdAt: "", claimedPlayer: { id: 1, name: "Alice" } },
+    });
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 1,
+          claimedByUserId: 5,
+        },
+      ],
+    });
+    vi.mocked(playersApi.getPlayerLayouts).mockResolvedValue({ layouts: [] });
+
+    renderPage();
+
+    await screen.findByText("Alice");
+    expect(await screen.findByText("You")).toBeInTheDocument();
   });
 
   it("shows hole stats for the selected layout", async () => {

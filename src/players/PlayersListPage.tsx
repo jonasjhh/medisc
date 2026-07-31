@@ -26,10 +26,12 @@ import Typography from "@mui/material/Typography";
 import { AddPlayerForm } from "./AddPlayerForm";
 import { deletePlayer, listPlayers, updatePlayer } from "./api";
 import type { Player } from "./api";
+import { useIdentity } from "../identity/IdentityContext";
 
 type Status = "loading" | "ready" | "error";
 
 export function PlayersListPage() {
+  const { user } = useIdentity();
   const [players, setPlayers] = useState<Player[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +80,9 @@ export function PlayersListPage() {
       setError(err instanceof Error ? err.message : "Failed to rename player");
     }
   };
+
+  const canEdit = (player: Player) =>
+    player.claimedByUserId === null || player.claimedByUserId === user?.id;
 
   const handlePlayerAdded = (player: Player) => {
     setPlayers((prev) =>
@@ -148,12 +153,23 @@ export function PlayersListPage() {
                   </>
                 ) : (
                   <>
-                    <IconButton
-                      aria-label={`edit ${player.name}`}
-                      onClick={() => startEdit(player)}
+                    <Tooltip
+                      title={
+                        canEdit(player)
+                          ? ""
+                          : "Only the player who claimed this profile can edit it"
+                      }
                     >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
+                      <span>
+                        <IconButton
+                          aria-label={`edit ${player.name}`}
+                          disabled={!canEdit(player)}
+                          onClick={() => startEdit(player)}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
                     <Tooltip
                       title={
                         player.claimedByUserId !== null

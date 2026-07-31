@@ -308,6 +308,75 @@ describe("claiming players", () => {
     );
     expect(players.map((p) => p.id)).toEqual([unclaimed.id]);
   });
+
+  it("lets anyone rename an unclaimed player", async () => {
+    const player = await createPlayer("Alice");
+    const res = await request(`/api/players/${player.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Ally" }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("lets the claiming user rename their claimed player", async () => {
+    const { deviceToken } = await seedUser(env);
+    const player = await createPlayer("Alice");
+    await request(`/api/players/${player.id}/claim`, {
+      method: "POST",
+      headers: { "X-Device-Token": deviceToken },
+    });
+
+    const res = await request(`/api/players/${player.id}`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "X-Device-Token": deviceToken,
+      },
+      body: JSON.stringify({ name: "Ally" }),
+    });
+    expect(res.status).toBe(200);
+    expect((await json<PlayerResponse>(res)).name).toBe("Ally");
+  });
+
+  it("403s renaming a claimed player as a different user", async () => {
+    const { deviceToken: ownerToken } = await seedUser(env);
+    const { deviceToken: otherToken } = await seedUser(env);
+    const player = await createPlayer("Alice");
+    await request(`/api/players/${player.id}/claim`, {
+      method: "POST",
+      headers: { "X-Device-Token": ownerToken },
+    });
+
+    const res = await request(`/api/players/${player.id}`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "X-Device-Token": otherToken,
+      },
+      body: JSON.stringify({ name: "Ally" }),
+    });
+    expect(res.status).toBe(403);
+    expect((await json<{ error: string }>(res)).error).toBe(
+      "Only the player who claimed this profile can edit it",
+    );
+  });
+
+  it("403s renaming a claimed player with no device identity at all", async () => {
+    const { deviceToken } = await seedUser(env);
+    const player = await createPlayer("Alice");
+    await request(`/api/players/${player.id}/claim`, {
+      method: "POST",
+      headers: { "X-Device-Token": deviceToken },
+    });
+
+    const res = await request(`/api/players/${player.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Ally" }),
+    });
+    expect(res.status).toBe(403);
+  });
 });
 
 describe("player stats", () => {
