@@ -29,6 +29,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { listPlayers } from "../players/api";
 import type { Player } from "../players/api";
+import { chunk } from "../shared/chunk";
 import {
   completeRound,
   getRound,
@@ -38,7 +39,10 @@ import {
 } from "./api";
 import type { RoundDetail, RoundPlayer } from "./api";
 import { ScoreAdjuster } from "./ScoreAdjuster";
+import { ScoreBadge } from "./ScoreBadge";
 import { scoreOutcome } from "./scoreColor";
+
+const HOLES_PER_GROUP = 9;
 
 const outcomeButtonColor = {
   birdie: "success",
@@ -268,6 +272,10 @@ export function RoundPage() {
   const birdieValue = Math.max(1, hole.par - 1);
   const bogeyValue = hole.par + 1;
   const coursePar = round.holes.reduce((sum, h) => sum + h.par, 0);
+  const holeGroups = chunk(round.holes, HOLES_PER_GROUP);
+  const scoreByKey = new Map(
+    round.scores.map((score) => [`${score.holeId}:${score.playerId}`, score]),
+  );
   const playersNotInRound = allPlayers.filter(
     (player) =>
       !round.players.some((roundPlayer) => roundPlayer.id === player.id),
@@ -472,83 +480,79 @@ export function RoundPage() {
       </Stack>
 
       {isSummary ? (
-        <Box sx={{ overflowX: "auto" }}>
-          <Table
-            size="small"
-            aria-label="Scorecard summary"
-            sx={{
-              "& td, & th": { px: 0.75, py: 0.5, fontSize: "0.8125rem" },
-            }}
-          >
-            <TableHead>
-              <TableRow>
-                <TableCell>Hole</TableCell>
-                <TableCell align="right">Par</TableCell>
-                {round.players.map((player) => (
-                  <TableCell key={player.id} align="right">
-                    {player.name}
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {round.holes.map((roundHole) => (
-                <TableRow key={roundHole.id}>
-                  <TableCell>{roundHole.number}</TableCell>
-                  <TableCell align="right">{roundHole.par}</TableCell>
-                  {round.players.map((player) => {
-                    const score = round.scores.find(
-                      (candidate) =>
-                        candidate.holeId === roundHole.id &&
-                        candidate.playerId === player.id,
-                    );
-                    if (!score) {
-                      return <TableCell key={player.id} align="right" />;
-                    }
-                    const outcome = scoreOutcome(score.strokes, roundHole.par);
-                    return (
-                      <TableCell
-                        key={player.id}
-                        align="right"
-                        sx={{
-                          color:
-                            outcome === "par"
-                              ? undefined
-                              : `${outcome === "birdie" ? "success" : "warning"}.main`,
-                          fontWeight: outcome === "par" ? undefined : 700,
-                        }}
-                      >
-                        {score.strokes}
+        <Stack spacing={2}>
+          <Stack direction="row" flexWrap="wrap" columnGap={2} rowGap={0.5}>
+            {round.players.map((player) => {
+              const total = round.scores
+                .filter((score) => score.playerId === player.id)
+                .reduce((sum, score) => sum + score.strokes, 0);
+              return (
+                <Typography key={player.id} fontWeight={600}>
+                  {player.name}: {total} ({relativeToPar(total, coursePar)})
+                </Typography>
+              );
+            })}
+          </Stack>
+
+          {holeGroups.map((holes) => (
+            <Box key={holes[0].id} sx={{ overflowX: "auto" }}>
+              <Table
+                size="small"
+                aria-label={`Scorecard summary, holes ${holes[0].number}–${holes[holes.length - 1].number}`}
+                sx={{
+                  "& td, & th": { px: 0.75, py: 0.5, fontSize: "0.8125rem" },
+                }}
+              >
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Hole</TableCell>
+                    {holes.map((roundHole) => (
+                      <TableCell key={roundHole.id} align="center">
+                        {roundHole.number}
                       </TableCell>
-                    );
-                  })}
-                </TableRow>
-              ))}
-              <TableRow>
-                <TableCell component="th" scope="row" sx={{ fontWeight: 700 }}>
-                  Total
-                </TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700 }}>
-                  {coursePar}
-                </TableCell>
-                {round.players.map((player) => {
-                  const total = round.scores
-                    .filter((score) => score.playerId === player.id)
-                    .reduce((sum, score) => sum + score.strokes, 0);
-                  return (
-                    <TableCell
-                      key={player.id}
-                      align="right"
-                      sx={{ fontWeight: 700 }}
-                    >
-                      {total} ({relativeToPar(total, coursePar)})
-                    </TableCell>
-                  );
-                })}
-              </TableRow>
-            </TableBody>
-          </Table>
-        </Box>
+                    ))}
+                  </TableRow>
+                  <TableRow>
+                    <TableCell sx={{ color: "text.secondary" }}>Par</TableCell>
+                    {holes.map((roundHole) => (
+                      <TableCell
+                        key={roundHole.id}
+                        align="center"
+                        sx={{ color: "text.secondary" }}
+                      >
+                        {roundHole.par}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {round.players.map((player) => (
+                    <TableRow key={player.id}>
+                      <TableCell component="th" scope="row">
+                        {player.name}
+                      </TableCell>
+                      {holes.map((roundHole) => {
+                        const score = scoreByKey.get(
+                          `${roundHole.id}:${player.id}`,
+                        );
+                        return (
+                          <TableCell key={roundHole.id} align="center">
+                            {score && (
+                              <ScoreBadge
+                                strokes={score.strokes}
+                                par={roundHole.par}
+                              />
+                            )}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          ))}
+        </Stack>
       ) : (
         <Stack spacing={1.5}>
           {round.players.map((player) => {

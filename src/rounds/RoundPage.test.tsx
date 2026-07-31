@@ -352,7 +352,8 @@ describe("RoundPage", () => {
     expect(await screen.findByText("Summary")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /next hole/i })).toBeDisabled();
     // Alice: 3 + 4 = 7 strokes against a course par of 7 (3 + 4) → even.
-    expect(screen.getByText("7 (E)")).toBeInTheDocument();
+    expect(screen.getByText("Alice: 7 (E)")).toBeInTheDocument();
+    expect(screen.getAllByTestId("score-badge")).toHaveLength(2);
   });
 
   it("navigates back from the summary to the last hole", async () => {

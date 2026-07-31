@@ -3,12 +3,20 @@ import Paper from "@mui/material/Paper";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
-import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
+import { chunk } from "../shared/chunk";
 import type { Hole, Layout } from "./api";
 
-function HoleTable({ holes, caption }: { holes: Hole[]; caption: string }) {
+const HOLES_PER_GROUP = 9;
+
+function HoleGroupTable({
+  holes,
+  caption,
+}: {
+  holes: Hole[];
+  caption: string;
+}) {
   return (
     <Table
       size="small"
@@ -18,32 +26,44 @@ function HoleTable({ holes, caption }: { holes: Hole[]; caption: string }) {
         "& td, & th": { px: 0.75, py: 0.25, fontSize: "0.8125rem" },
       }}
     >
-      <TableHead>
-        <TableRow>
-          <TableCell>Hole</TableCell>
-          <TableCell align="right">Par</TableCell>
-          <TableCell align="right">Dist.</TableCell>
-        </TableRow>
-      </TableHead>
       <TableBody>
-        {holes.map((hole) => (
-          <TableRow key={hole.id}>
-            <TableCell>{hole.number}</TableCell>
-            <TableCell align="right">{hole.par}</TableCell>
-            <TableCell align="right">
-              {hole.distanceMeters ? `${hole.distanceMeters} m` : "—"}
+        <TableRow>
+          <TableCell component="th" scope="row">
+            Hole
+          </TableCell>
+          {holes.map((hole) => (
+            <TableCell key={hole.id} align="center">
+              {hole.number}
             </TableCell>
-          </TableRow>
-        ))}
+          ))}
+        </TableRow>
+        <TableRow>
+          <TableCell component="th" scope="row">
+            Dist.
+          </TableCell>
+          {holes.map((hole) => (
+            <TableCell key={hole.id} align="center">
+              {hole.distanceMeters ?? "—"}
+            </TableCell>
+          ))}
+        </TableRow>
+        <TableRow>
+          <TableCell component="th" scope="row">
+            Par
+          </TableCell>
+          {holes.map((hole) => (
+            <TableCell key={hole.id} align="center">
+              {hole.par}
+            </TableCell>
+          ))}
+        </TableRow>
       </TableBody>
     </Table>
   );
 }
 
 export function LayoutCard({ layout }: { layout: Layout }) {
-  const half = Math.ceil(layout.holes.length / 2);
-  const front = layout.holes.slice(0, half);
-  const back = layout.holes.slice(half);
+  const groups = chunk(layout.holes, HOLES_PER_GROUP);
 
   return (
     <Paper variant="outlined" sx={{ p: 1.5 }}>
@@ -51,7 +71,7 @@ export function LayoutCard({ layout }: { layout: Layout }) {
         {layout.name}
       </Typography>
 
-      {layout.holes.length > 0 ? (
+      {groups.length > 0 ? (
         <Box
           sx={{
             display: "flex",
@@ -60,16 +80,13 @@ export function LayoutCard({ layout }: { layout: Layout }) {
             overflowX: "auto",
           }}
         >
-          <HoleTable
-            holes={front}
-            caption={`${layout.name}, holes 1–${half}`}
-          />
-          {back.length > 0 && (
-            <HoleTable
-              holes={back}
-              caption={`${layout.name}, holes ${half + 1}–${layout.holes.length}`}
+          {groups.map((holes) => (
+            <HoleGroupTable
+              key={holes[0].id}
+              holes={holes}
+              caption={`${layout.name}, holes ${holes[0].number}–${holes[holes.length - 1].number}`}
             />
-          )}
+          ))}
         </Box>
       ) : (
         <Typography variant="body2" color="text.secondary">

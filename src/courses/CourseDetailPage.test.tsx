@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CourseDetailPage } from "./CourseDetailPage";
@@ -23,6 +23,25 @@ const baseCourse: api.CourseDetail = {
   ],
 };
 
+const eighteenHoleCourse: api.CourseDetail = {
+  id: 2,
+  name: "Dragvoll",
+  createdAt: "",
+  layouts: [
+    {
+      id: 20,
+      name: "Standard",
+      createdAt: "",
+      holes: Array.from({ length: 18 }, (_, i) => ({
+        id: 200 + i,
+        number: i + 1,
+        par: 3,
+        distanceMeters: 80 + i,
+      })),
+    },
+  ],
+};
+
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/courses/1"]}>
@@ -38,19 +57,30 @@ describe("CourseDetailPage", () => {
     vi.mocked(api.getCourse).mockResolvedValue(baseCourse);
   });
 
-  it("shows the course, its layouts, and holes split across two hole tables", async () => {
+  it("shows the course, its layouts, and holes in a single group when 9 or fewer", async () => {
     renderPage();
 
     expect(await screen.findByText("Maple Hill")).toBeInTheDocument();
     expect(screen.getByText("Blue")).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: /holes 1–1/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("table", { name: /holes 2–2/i }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("275 m")).toBeInTheDocument();
-    expect(screen.getByText("—")).toBeInTheDocument();
+    const table = screen.getByRole("table", { name: /holes 1–2/i });
+    expect(within(table).getByText("275")).toBeInTheDocument();
+    expect(within(table).getByText("—")).toBeInTheDocument();
+    expect(within(table).getByText("Hole")).toBeInTheDocument();
+    expect(within(table).getByText("Dist.")).toBeInTheDocument();
+    expect(within(table).getByText("Par")).toBeInTheDocument();
+  });
+
+  it("splits holes into groups of 9 for longer layouts", async () => {
+    vi.mocked(api.getCourse).mockResolvedValue(eighteenHoleCourse);
+    renderPage();
+
+    expect(await screen.findByText("Dragvoll")).toBeInTheDocument();
+    const front = screen.getByRole("table", { name: /holes 1–9/i });
+    const back = screen.getByRole("table", { name: /holes 10–18/i });
+    expect(within(front).getByText("9")).toBeInTheDocument();
+    expect(within(front).queryByText("10")).not.toBeInTheDocument();
+    expect(within(back).getByText("10")).toBeInTheDocument();
+    expect(within(back).getByText("18")).toBeInTheDocument();
   });
 
   it("shows an empty state when a course has no layouts", async () => {
