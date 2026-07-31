@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  claimPlayer,
   createPlayer,
   deletePlayer,
   getPlayerLayouts,
@@ -56,9 +57,22 @@ describe("players api", () => {
   });
 
   it("lists players", async () => {
-    mockFetchOnce({ players: [{ id: 1, name: "Alice", createdAt: "" }] });
+    mockFetchOnce({
+      players: [{ id: 1, name: "Alice", createdAt: "", claimedByUserId: null }],
+    });
     const { players } = await listPlayers();
-    expect(players).toEqual([{ id: 1, name: "Alice", createdAt: "" }]);
+    expect(players).toEqual([
+      { id: 1, name: "Alice", createdAt: "", claimedByUserId: null },
+    ]);
+  });
+
+  it("lists only unclaimed players when requested", async () => {
+    const fetchMock = mockFetchOnce({ players: [] });
+    await listPlayers({ unclaimed: true });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/players?unclaimed=true",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
   });
 
   it("gets the layouts a player has played", async () => {
@@ -74,7 +88,10 @@ describe("players api", () => {
     });
     const { layouts } = await getPlayerLayouts(1);
     expect(layouts).toHaveLength(1);
-    expect(fetchMock).toHaveBeenCalledWith("/api/players/1/layouts", undefined);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/players/1/layouts",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
   });
 
   it("gets a player's hole stats for a layout", async () => {
@@ -85,7 +102,7 @@ describe("players api", () => {
     expect(holes).toHaveLength(1);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/players/1/stats?layoutId=2",
-      undefined,
+      expect.objectContaining({ headers: expect.any(Headers) }),
     );
   });
 
@@ -95,6 +112,21 @@ describe("players api", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/players/1",
       expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("claims a player", async () => {
+    const fetchMock = mockFetchOnce({
+      id: 1,
+      name: "Alice",
+      createdAt: "",
+      roundCount: 0,
+      claimedByUserId: 5,
+    });
+    await claimPlayer(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/players/1/claim",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({}) }),
     );
   });
 });

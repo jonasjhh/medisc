@@ -15,7 +15,15 @@ describe("RoundsListPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
-      players: [{ id: 1, name: "Alice", createdAt: "", roundCount: 1 }],
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 1,
+          claimedByUserId: null,
+        },
+      ],
     });
     vi.mocked(coursesApi.listCourses).mockResolvedValue({
       courses: [{ id: 1, name: "Maple Hill", createdAt: "", layoutCount: 1 }],

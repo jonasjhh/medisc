@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Env } from "../types";
+import type { AppEnv } from "../types";
 import { updateHoleScoreSchema } from "../schemas";
 
 interface HoleScoreRow {
@@ -11,7 +11,7 @@ interface HoleScoreRow {
   penalties: number;
 }
 
-export const holeScoresRoute = new Hono<{ Bindings: Env }>();
+export const holeScoresRoute = new Hono<AppEnv>();
 
 holeScoresRoute.patch("/:id", async (c) => {
   const id = Number(c.req.param("id"));

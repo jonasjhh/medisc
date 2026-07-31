@@ -14,7 +14,15 @@ describe("PlayersListPage", () => {
 
   it("lists existing players", async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
-      players: [{ id: 1, name: "Alice", createdAt: "", roundCount: 0 }],
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: null,
+        },
+      ],
     });
 
     render(
@@ -28,13 +36,22 @@ describe("PlayersListPage", () => {
 
   it("adds a new player", async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
-      players: [{ id: 1, name: "Alice", createdAt: "", roundCount: 0 }],
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: null,
+        },
+      ],
     });
     vi.mocked(playersApi.createPlayer).mockResolvedValue({
       id: 2,
       name: "Bob",
       createdAt: "",
       roundCount: 0,
+      claimedByUserId: null,
     });
     const user = userEvent.setup();
 
@@ -54,13 +71,22 @@ describe("PlayersListPage", () => {
 
   it("renames a player", async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
-      players: [{ id: 1, name: "Alice", createdAt: "", roundCount: 0 }],
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: null,
+        },
+      ],
     });
     vi.mocked(playersApi.updatePlayer).mockResolvedValue({
       id: 1,
       name: "Ally",
       createdAt: "",
       roundCount: 0,
+      claimedByUserId: null,
     });
     const user = userEvent.setup();
 
@@ -84,7 +110,15 @@ describe("PlayersListPage", () => {
 
   it("cancels an edit without saving", async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
-      players: [{ id: 1, name: "Alice", createdAt: "", roundCount: 0 }],
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: null,
+        },
+      ],
     });
     const user = userEvent.setup();
 
@@ -116,7 +150,15 @@ describe("PlayersListPage", () => {
 
   it("deletes a player with no recorded rounds after confirming", async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
-      players: [{ id: 1, name: "Alice", createdAt: "", roundCount: 0 }],
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: null,
+        },
+      ],
     });
     vi.mocked(playersApi.deletePlayer).mockResolvedValue(undefined);
     const user = userEvent.setup();
@@ -141,7 +183,15 @@ describe("PlayersListPage", () => {
 
   it("cancels player deletion without calling the API", async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
-      players: [{ id: 1, name: "Alice", createdAt: "", roundCount: 0 }],
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: null,
+        },
+      ],
     });
     const user = userEvent.setup();
 
@@ -163,7 +213,40 @@ describe("PlayersListPage", () => {
 
   it("disables deleting a player who has recorded rounds", async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
-      players: [{ id: 1, name: "Alice", createdAt: "", roundCount: 2 }],
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 2,
+          claimedByUserId: null,
+        },
+      ],
+    });
+
+    render(
+      <MemoryRouter>
+        <PlayersListPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Alice");
+    expect(
+      screen.getByRole("button", { name: /delete alice/i }),
+    ).toBeDisabled();
+  });
+
+  it("disables deleting a claimed player even with zero recorded rounds", async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: 5,
+        },
+      ],
     });
 
     render(

@@ -156,16 +156,21 @@ export function PlayersListPage() {
                     </IconButton>
                     <Tooltip
                       title={
-                        player.roundCount > 0
-                          ? "Can't delete a player with recorded rounds"
-                          : ""
+                        player.claimedByUserId !== null
+                          ? "This player is claimed and can't be deleted — unclaim it from Settings first"
+                          : player.roundCount > 0
+                            ? "Can't delete a player with recorded rounds"
+                            : ""
                       }
                     >
                       <span>
                         <IconButton
                           edge="end"
                           aria-label={`delete ${player.name}`}
-                          disabled={player.roundCount > 0}
+                          disabled={
+                            player.roundCount > 0 ||
+                            player.claimedByUserId !== null
+                          }
                           onClick={() => setDeleteTarget(player)}
                         >
                           <DeleteIcon fontSize="small" />

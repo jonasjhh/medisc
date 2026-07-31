@@ -37,3 +37,7 @@ export const updateHoleScoreSchema = z
       message: "strokes or penalties must be provided",
     },
   );
+
+export const linkDeviceSchema = z.object({
+  code: z.string().trim().toUpperCase().length(8),
+});

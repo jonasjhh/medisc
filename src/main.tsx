@@ -5,6 +5,7 @@ import { ThemeProvider } from "@mui/material/styles";
 import { App } from "./App";
 import { createAppTheme } from "./app/theme";
 import { ThemeModeProvider, useThemeMode } from "./app/ThemeModeContext";
+import { IdentityProvider } from "./identity/IdentityContext";
 
 function ThemedApp() {
   const { resolvedMode } = useThemeMode();
@@ -19,7 +20,9 @@ function ThemedApp() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeModeProvider>
-      <ThemedApp />
+      <IdentityProvider>
+        <ThemedApp />
+      </IdentityProvider>
     </ThemeModeProvider>
   </StrictMode>,
 );

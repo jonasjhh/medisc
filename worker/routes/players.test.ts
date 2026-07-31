@@ -1,13 +1,14 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import app from "../index";
-import { seedCourse } from "../test/seed";
+import { seedCourse, seedUser } from "../test/seed";
 
 interface PlayerResponse {
   id: number;
   name: string;
   createdAt: string;
   roundCount: number;
+  claimedByUserId: number | null;
 }
 
 async function json<T>(response: Response): Promise<T> {
@@ -26,7 +27,10 @@ describe("players API", () => {
     await env.DB.exec("DELETE FROM holes");
     await env.DB.exec("DELETE FROM layouts");
     await env.DB.exec("DELETE FROM courses");
+    await env.DB.exec("DELETE FROM device_link_codes");
+    await env.DB.exec("DELETE FROM device_tokens");
     await env.DB.exec("DELETE FROM players");
+    await env.DB.exec("DELETE FROM users");
   });
 
   it("creates and lists players", async () => {
@@ -37,7 +41,11 @@ describe("players API", () => {
     });
     expect(createRes.status).toBe(201);
     const created = await json<PlayerResponse>(createRes);
-    expect(created).toMatchObject({ name: "Jonas", roundCount: 0 });
+    expect(created).toMatchObject({
+      name: "Jonas",
+      roundCount: 0,
+      claimedByUserId: null,
+    });
 
     const listRes = await request("/api/players");
     const { players } = await json<{ players: PlayerResponse[] }>(listRes);
@@ -47,6 +55,7 @@ describe("players API", () => {
         name: "Jonas",
         createdAt: created.createdAt,
         roundCount: 0,
+        claimedByUserId: null,
       },
     ]);
   });
@@ -163,6 +172,142 @@ describe("players API", () => {
     });
     expect(res.status).toBe(409);
   });
+
+  it("refuses to delete a claimed player even with zero recorded rounds", async () => {
+    const { userId, deviceToken } = await seedUser(env);
+    const player = await json<PlayerResponse>(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+    );
+    const claimRes = await request(`/api/players/${player.id}/claim`, {
+      method: "POST",
+      headers: { "X-Device-Token": deviceToken },
+    });
+    expect(claimRes.status).toBe(200);
+    expect((await json<PlayerResponse>(claimRes)).claimedByUserId).toBe(userId);
+
+    const res = await request(`/api/players/${player.id}`, {
+      method: "DELETE",
+    });
+    expect(res.status).toBe(409);
+    expect((await json<{ error: string }>(res)).error).toBe(
+      "Cannot delete a claimed player",
+    );
+  });
+});
+
+describe("claiming players", () => {
+  beforeEach(async () => {
+    await env.DB.exec("DELETE FROM hole_scores");
+    await env.DB.exec("DELETE FROM round_players");
+    await env.DB.exec("DELETE FROM rounds");
+    await env.DB.exec("DELETE FROM holes");
+    await env.DB.exec("DELETE FROM layouts");
+    await env.DB.exec("DELETE FROM courses");
+    await env.DB.exec("DELETE FROM device_link_codes");
+    await env.DB.exec("DELETE FROM device_tokens");
+    await env.DB.exec("DELETE FROM players");
+    await env.DB.exec("DELETE FROM users");
+  });
+
+  async function createPlayer(name: string) {
+    return json<PlayerResponse>(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      }),
+    );
+  }
+
+  it("401s claiming without a resolved device identity", async () => {
+    const player = await createPlayer("Alice");
+    const res = await request(`/api/players/${player.id}/claim`, {
+      method: "POST",
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("404s claiming a player that doesn't exist", async () => {
+    const { deviceToken } = await seedUser(env);
+    const res = await request("/api/players/999/claim", {
+      method: "POST",
+      headers: { "X-Device-Token": deviceToken },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("claims an unclaimed player and reflects it on the list", async () => {
+    const { userId, deviceToken } = await seedUser(env);
+    const player = await createPlayer("Alice");
+
+    const res = await request(`/api/players/${player.id}/claim`, {
+      method: "POST",
+      headers: { "X-Device-Token": deviceToken },
+    });
+    expect(res.status).toBe(200);
+    expect(await json<PlayerResponse>(res)).toMatchObject({
+      id: player.id,
+      claimedByUserId: userId,
+    });
+
+    const { players } = await json<{ players: PlayerResponse[] }>(
+      await request("/api/players"),
+    );
+    expect(players[0].claimedByUserId).toBe(userId);
+  });
+
+  it("409s claiming a player that's already claimed", async () => {
+    const { deviceToken: tokenA } = await seedUser(env);
+    const { deviceToken: tokenB } = await seedUser(env);
+    const player = await createPlayer("Alice");
+
+    await request(`/api/players/${player.id}/claim`, {
+      method: "POST",
+      headers: { "X-Device-Token": tokenA },
+    });
+
+    const res = await request(`/api/players/${player.id}/claim`, {
+      method: "POST",
+      headers: { "X-Device-Token": tokenB },
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("409s claiming a second player once you already have one", async () => {
+    const { deviceToken } = await seedUser(env);
+    const first = await createPlayer("Alice");
+    const second = await createPlayer("Bob");
+
+    await request(`/api/players/${first.id}/claim`, {
+      method: "POST",
+      headers: { "X-Device-Token": deviceToken },
+    });
+
+    const res = await request(`/api/players/${second.id}/claim`, {
+      method: "POST",
+      headers: { "X-Device-Token": deviceToken },
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("filters the unclaimed player list", async () => {
+    const { deviceToken } = await seedUser(env);
+    const claimed = await createPlayer("Alice");
+    const unclaimed = await createPlayer("Bob");
+    await request(`/api/players/${claimed.id}/claim`, {
+      method: "POST",
+      headers: { "X-Device-Token": deviceToken },
+    });
+
+    const { players } = await json<{ players: PlayerResponse[] }>(
+      await request("/api/players?unclaimed=true"),
+    );
+    expect(players.map((p) => p.id)).toEqual([unclaimed.id]);
+  });
 });
 
 describe("player stats", () => {
@@ -173,7 +318,10 @@ describe("player stats", () => {
     await env.DB.exec("DELETE FROM holes");
     await env.DB.exec("DELETE FROM layouts");
     await env.DB.exec("DELETE FROM courses");
+    await env.DB.exec("DELETE FROM device_link_codes");
+    await env.DB.exec("DELETE FROM device_tokens");
     await env.DB.exec("DELETE FROM players");
+    await env.DB.exec("DELETE FROM users");
   });
 
   function setUpCourseWithOneHole() {

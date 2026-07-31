@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Env } from "../types";
+import type { AppEnv } from "../types";
 import { createRoundSchema, updateRoundSchema } from "../schemas";
 
 interface RoundRow {
@@ -112,7 +112,7 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
   };
 }
 
-export const roundsRoute = new Hono<{ Bindings: Env }>();
+export const roundsRoute = new Hono<AppEnv>();
 
 roundsRoute.post("/", async (c) => {
   const body = await c.req.json().catch(() => null);

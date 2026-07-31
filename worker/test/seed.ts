@@ -35,3 +35,18 @@ export async function seedCourse(
 
   return { courseId: course!.id, layoutId: layout!.id };
 }
+
+export async function seedUser(env: Env, options?: { deviceToken?: string }) {
+  const token = options?.deviceToken ?? crypto.randomUUID();
+  const user = await env.DB.prepare(
+    "INSERT INTO users (created_at) VALUES (datetime('now')) RETURNING id, created_at",
+  ).first<{ id: number; created_at: string }>();
+
+  await env.DB.prepare(
+    "INSERT INTO device_tokens (token, user_id) VALUES (?, ?)",
+  )
+    .bind(token, user!.id)
+    .run();
+
+  return { userId: user!.id, deviceToken: token, createdAt: user!.created_at };
+}

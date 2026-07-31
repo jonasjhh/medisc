@@ -7,10 +7,14 @@ import {
 } from "react-router-dom";
 import BrightnessAutoIcon from "@mui/icons-material/BrightnessAuto";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
+import DevicesIcon from "@mui/icons-material/Devices";
 import LightModeIcon from "@mui/icons-material/LightMode";
+import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
@@ -31,6 +35,10 @@ import { InstallPrompt } from "./app/InstallPrompt";
 import { UpdatePrompt } from "./app/UpdatePrompt";
 import { useThemeMode } from "./app/ThemeModeContext";
 import type { ThemeModePreference } from "./app/ThemeModeContext";
+import { IdentityModal } from "./identity/IdentityModal";
+import { LinkCodeDialog } from "./identity/LinkCodeDialog";
+import { UnclaimDialog } from "./identity/UnclaimDialog";
+import { useIdentity } from "./identity/IdentityContext";
 
 const modeIcons: Record<ThemeModePreference, typeof LightModeIcon> = {
   light: LightModeIcon,
@@ -40,7 +48,10 @@ const modeIcons: Record<ThemeModePreference, typeof LightModeIcon> = {
 
 function ThemeModeMenu() {
   const { preference, setPreference } = useThemeMode();
+  const { status, user, openOnboarding } = useIdentity();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [linkCodeOpen, setLinkCodeOpen] = useState(false);
+  const [unclaimOpen, setUnclaimOpen] = useState(false);
   const CurrentIcon = modeIcons[preference];
 
   const choose = (next: ThemeModePreference) => {
@@ -89,7 +100,71 @@ function ThemeModeMenu() {
           </ListItemIcon>
           <ListItemText>System</ListItemText>
         </MenuItem>
+        {status === "ready" && (
+          <>
+            <Divider />
+            {user === null && (
+              <MenuItem
+                onClick={() => {
+                  setAnchorEl(null);
+                  openOnboarding("welcome");
+                }}
+              >
+                <ListItemIcon>
+                  <PersonAddIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Set up profile</ListItemText>
+              </MenuItem>
+            )}
+            {user !== null && user.claimedPlayer === null && (
+              <MenuItem
+                onClick={() => {
+                  setAnchorEl(null);
+                  openOnboarding("claim");
+                }}
+              >
+                <ListItemIcon>
+                  <PersonSearchIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Claim a guest profile</ListItemText>
+              </MenuItem>
+            )}
+            {user !== null && user.claimedPlayer !== null && (
+              <MenuItem
+                onClick={() => {
+                  setAnchorEl(null);
+                  setUnclaimOpen(true);
+                }}
+              >
+                <ListItemIcon>
+                  <PersonSearchIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>
+                  Playing as {user.claimedPlayer.name} — this isn&apos;t me
+                </ListItemText>
+              </MenuItem>
+            )}
+            {user !== null && (
+              <MenuItem
+                onClick={() => {
+                  setAnchorEl(null);
+                  setLinkCodeOpen(true);
+                }}
+              >
+                <ListItemIcon>
+                  <DevicesIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Link another device</ListItemText>
+              </MenuItem>
+            )}
+          </>
+        )}
       </Menu>
+      <LinkCodeDialog
+        open={linkCodeOpen}
+        onClose={() => setLinkCodeOpen(false)}
+      />
+      <UnclaimDialog open={unclaimOpen} onClose={() => setUnclaimOpen(false)} />
     </>
   );
 }
@@ -131,6 +206,7 @@ export function App() {
     >
       <UpdatePrompt />
       <InstallPrompt />
+      <IdentityModal />
       <NavBar />
       <Box component="main">
         <Routes>

@@ -1,11 +1,12 @@
 import { Hono } from "hono";
-import type { Env } from "../types";
+import type { AppEnv } from "../types";
 import { createPlayerSchema, updatePlayerSchema } from "../schemas";
 
 interface PlayerRow {
   id: number;
   name: string;
   created_at: string;
+  claimed_by_user_id: number | null;
 }
 
 interface PlayerListRow extends PlayerRow {
@@ -40,7 +41,7 @@ async function countPlayerRounds(db: D1Database, playerId: number) {
   return row!.round_count;
 }
 
-export const playersRoute = new Hono<{ Bindings: Env }>();
+export const playersRoute = new Hono<AppEnv>();
 
 playersRoute.post("/", async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -50,23 +51,32 @@ playersRoute.post("/", async (c) => {
   }
 
   const row = await c.env.DB.prepare(
-    "INSERT INTO players (name) VALUES (?) RETURNING id, name, created_at",
+    "INSERT INTO players (name) VALUES (?) RETURNING id, name, created_at, claimed_by_user_id",
   )
     .bind(parsed.data.name)
     .first<PlayerRow>();
 
   return c.json(
-    { id: row!.id, name: row!.name, createdAt: row!.created_at, roundCount: 0 },
+    {
+      id: row!.id,
+      name: row!.name,
+      createdAt: row!.created_at,
+      roundCount: 0,
+      claimedByUserId: row!.claimed_by_user_id,
+    },
     201,
   );
 });
 
 playersRoute.get("/", async (c) => {
+  const unclaimedOnly = c.req.query("unclaimed") === "true";
+  const where = unclaimedOnly ? "WHERE players.claimed_by_user_id IS NULL" : "";
   const { results } = await c.env.DB.prepare(
-    `SELECT players.id, players.name, players.created_at,
+    `SELECT players.id, players.name, players.created_at, players.claimed_by_user_id,
             COUNT(DISTINCT round_players.round_id) AS round_count
      FROM players
      LEFT JOIN round_players ON round_players.player_id = players.id
+     ${where}
      GROUP BY players.id
      ORDER BY players.name`,
   ).all<PlayerListRow>();
@@ -77,6 +87,7 @@ playersRoute.get("/", async (c) => {
       name: row.name,
       createdAt: row.created_at,
       roundCount: row.round_count,
+      claimedByUserId: row.claimed_by_user_id,
     })),
   });
 });
@@ -101,7 +112,7 @@ playersRoute.patch("/:playerId", async (c) => {
   }
 
   const row = await c.env.DB.prepare(
-    "UPDATE players SET name = ? WHERE id = ? RETURNING id, name, created_at",
+    "UPDATE players SET name = ? WHERE id = ? RETURNING id, name, created_at, claimed_by_user_id",
   )
     .bind(parsed.data.name, playerId)
     .first<PlayerRow>();
@@ -113,6 +124,7 @@ playersRoute.patch("/:playerId", async (c) => {
     name: row!.name,
     createdAt: row!.created_at,
     roundCount,
+    claimedByUserId: row!.claimed_by_user_id,
   });
 });
 
@@ -122,11 +134,17 @@ playersRoute.delete("/:playerId", async (c) => {
     return c.json({ error: "Invalid player id" }, 400);
   }
 
-  const existing = await c.env.DB.prepare("SELECT id FROM players WHERE id = ?")
+  const existing = await c.env.DB.prepare(
+    "SELECT id, claimed_by_user_id FROM players WHERE id = ?",
+  )
     .bind(playerId)
-    .first();
+    .first<{ id: number; claimed_by_user_id: number | null }>();
   if (!existing) {
     return c.json({ error: "Player not found" }, 404);
+  }
+
+  if (existing.claimed_by_user_id !== null) {
+    return c.json({ error: "Cannot delete a claimed player" }, 409);
   }
 
   const roundCount = await countPlayerRounds(c.env.DB, playerId);
@@ -229,5 +247,65 @@ playersRoute.get("/:playerId/stats", async (c) => {
       worstStrokes: row.worst_strokes,
       avgPenalties: row.avg_penalties,
     })),
+  });
+});
+
+playersRoute.post("/:playerId/claim", async (c) => {
+  const playerId = Number(c.req.param("playerId"));
+  if (!Number.isInteger(playerId)) {
+    return c.json({ error: "Invalid player id" }, 400);
+  }
+
+  const userId = c.get("userId");
+  if (userId === null) {
+    return c.json({ error: "No user found for this device" }, 401);
+  }
+
+  const player = await c.env.DB.prepare(
+    "SELECT id, claimed_by_user_id FROM players WHERE id = ?",
+  )
+    .bind(playerId)
+    .first<{ id: number; claimed_by_user_id: number | null }>();
+  if (!player) {
+    return c.json({ error: "Player not found" }, 404);
+  }
+  if (player.claimed_by_user_id !== null) {
+    return c.json({ error: "Player is already claimed" }, 409);
+  }
+
+  const alreadyClaimed = await c.env.DB.prepare(
+    "SELECT id FROM players WHERE claimed_by_user_id = ?",
+  )
+    .bind(userId)
+    .first();
+  if (alreadyClaimed) {
+    return c.json(
+      { error: "You have already claimed a different player" },
+      409,
+    );
+  }
+
+  const updated = await c.env.DB.prepare(
+    "UPDATE players SET claimed_by_user_id = ? WHERE id = ? AND claimed_by_user_id IS NULL",
+  )
+    .bind(userId, playerId)
+    .run();
+  if (updated.meta.changes === 0) {
+    return c.json({ error: "Player was just claimed by someone else" }, 409);
+  }
+
+  const roundCount = await countPlayerRounds(c.env.DB, playerId);
+  const row = await c.env.DB.prepare(
+    "SELECT id, name, created_at, claimed_by_user_id FROM players WHERE id = ?",
+  )
+    .bind(playerId)
+    .first<PlayerRow>();
+
+  return c.json({
+    id: row!.id,
+    name: row!.name,
+    createdAt: row!.created_at,
+    roundCount,
+    claimedByUserId: row!.claimed_by_user_id,
   });
 });

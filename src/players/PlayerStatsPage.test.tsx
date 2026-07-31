@@ -20,7 +20,15 @@ function renderPage() {
 describe("PlayerStatsPage", () => {
   beforeEach(() => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
-      players: [{ id: 1, name: "Alice", createdAt: "", roundCount: 1 }],
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 1,
+          claimedByUserId: null,
+        },
+      ],
     });
   });
 

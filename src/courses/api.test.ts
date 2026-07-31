@@ -21,7 +21,10 @@ describe("courses api", () => {
   it("gets a course's detail", async () => {
     const fetchMock = mockFetchOnce({ id: 1, name: "Maple Hill", layouts: [] });
     await getCourse(1);
-    expect(fetchMock).toHaveBeenCalledWith("/api/courses/1", undefined);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/courses/1",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
   });
 
   it("surfaces the server's error message on failure", async () => {

@@ -44,8 +44,20 @@ describe("RoundPage", () => {
     vi.mocked(roundsApi.getRound).mockResolvedValue(baseRound);
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
       players: [
-        { id: 1, name: "Alice", createdAt: "", roundCount: 1 },
-        { id: 2, name: "Bob", createdAt: "", roundCount: 0 },
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 1,
+          claimedByUserId: null,
+        },
+        {
+          id: 2,
+          name: "Bob",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: null,
+        },
       ],
     });
   });
@@ -329,7 +341,15 @@ describe("RoundPage", () => {
 
   it("disables the swap button when there is nobody else to swap in", async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
-      players: [{ id: 1, name: "Alice", createdAt: "", roundCount: 1 }],
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 1,
+          claimedByUserId: null,
+        },
+      ],
     });
     renderPage();
 

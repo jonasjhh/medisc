@@ -56,7 +56,10 @@ describe("rounds api", () => {
     });
     const { rounds } = await listRounds();
     expect(rounds).toEqual([{ id: 1, courseName: "Maple Hill" }]);
-    expect(fetchMock).toHaveBeenCalledWith("/api/rounds", undefined);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rounds",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
   });
 
   it("lists rounds with filters as query params", async () => {
@@ -64,7 +67,7 @@ describe("rounds api", () => {
     await listRounds({ status: "completed", playerId: 5, courseId: 9 });
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/rounds?status=completed&playerId=5&courseId=9",
-      undefined,
+      expect.objectContaining({ headers: expect.any(Headers) }),
     );
   });
 
@@ -76,7 +79,10 @@ describe("rounds api", () => {
       scores: [],
     });
     await getRound(1);
-    expect(fetchMock).toHaveBeenCalledWith("/api/rounds/1", undefined);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rounds/1",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
   });
 
   it("updates a hole score", async () => {

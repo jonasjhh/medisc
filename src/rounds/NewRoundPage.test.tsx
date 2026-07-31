@@ -14,7 +14,15 @@ vi.mock("./api");
 describe("NewRoundPage", () => {
   beforeEach(() => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
-      players: [{ id: 1, name: "Alice", createdAt: "", roundCount: 0 }],
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: null,
+        },
+      ],
     });
     vi.mocked(coursesApi.listCourses).mockResolvedValue({
       courses: [{ id: 1, name: "Maple Hill", createdAt: "", layoutCount: 1 }],
@@ -44,6 +52,7 @@ describe("NewRoundPage", () => {
       name: "Bob",
       createdAt: "",
       roundCount: 0,
+      claimedByUserId: null,
     });
     const user = userEvent.setup();
     renderPage();

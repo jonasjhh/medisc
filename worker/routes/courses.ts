@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Env } from "../types";
+import type { AppEnv } from "../types";
 
 interface CourseRow {
   id: number;
@@ -26,7 +26,7 @@ interface HoleRow {
   distance_meters: number | null;
 }
 
-export const coursesRoute = new Hono<{ Bindings: Env }>();
+export const coursesRoute = new Hono<AppEnv>();
 
 coursesRoute.get("/", async (c) => {
   const { results } = await c.env.DB.prepare(

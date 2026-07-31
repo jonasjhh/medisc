@@ -5,6 +5,7 @@ export interface Player {
   name: string;
   createdAt: string;
   roundCount: number;
+  claimedByUserId: number | null;
 }
 
 export interface PlayedLayout {
@@ -25,12 +26,20 @@ export interface HoleStat {
   avgPenalties: number;
 }
 
-export function listPlayers(): Promise<{ players: Player[] }> {
-  return request("/api/players");
+export function listPlayers(options?: {
+  unclaimed?: boolean;
+}): Promise<{ players: Player[] }> {
+  return request(
+    options?.unclaimed ? "/api/players?unclaimed=true" : "/api/players",
+  );
 }
 
 export function createPlayer(name: string): Promise<Player> {
   return postJson("/api/players", { name });
+}
+
+export function claimPlayer(playerId: number): Promise<Player> {
+  return postJson(`/api/players/${playerId}/claim`, {});
 }
 
 export function updatePlayer(playerId: number, name: string): Promise<Player> {
