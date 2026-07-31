@@ -38,6 +38,9 @@ describe("NewRoundPage", () => {
       layouts: [{ id: 10, name: "Blue", createdAt: "", holes: [] }],
     });
     vi.mocked(identityApi.getCurrentUser).mockResolvedValue({ user: null });
+    vi.mocked(playersApi.getRecentCourses).mockResolvedValue({
+      recentCourses: [],
+    });
   });
 
   function renderPage() {
@@ -191,5 +194,131 @@ describe("NewRoundPage", () => {
       expect(screen.getByLabelText("Alice")).toBeChecked();
     });
     expect(screen.getByLabelText("Bob")).not.toBeChecked();
+  });
+
+  function mockClaimedPlayer() {
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({
+      user: {
+        id: 42,
+        createdAt: "",
+        claimedPlayer: { id: 1, name: "Alice" },
+      },
+    });
+  }
+
+  it("hides the recent courses section when there are none", async () => {
+    mockClaimedPlayer();
+    renderPage();
+
+    await screen.findByText("Alice");
+    expect(screen.queryByText("Recent courses")).not.toBeInTheDocument();
+  });
+
+  it("hides the recent courses section without a claimed player", async () => {
+    const callsBefore = vi.mocked(playersApi.getRecentCourses).mock.calls
+      .length;
+    vi.mocked(playersApi.getRecentCourses).mockResolvedValue({
+      recentCourses: [
+        {
+          courseId: 1,
+          courseName: "Maple Hill",
+          layoutId: 10,
+          layoutName: "Blue",
+        },
+      ],
+    });
+    renderPage();
+
+    await screen.findByText("Alice");
+    expect(vi.mocked(playersApi.getRecentCourses).mock.calls.length).toBe(
+      callsBefore,
+    );
+    expect(screen.queryByText("Recent courses")).not.toBeInTheDocument();
+  });
+
+  it("shows however many recent courses exist, up to 3", async () => {
+    mockClaimedPlayer();
+    vi.mocked(playersApi.getRecentCourses).mockResolvedValue({
+      recentCourses: [
+        {
+          courseId: 1,
+          courseName: "Maple Hill",
+          layoutId: 10,
+          layoutName: "Blue",
+        },
+        {
+          courseId: 2,
+          courseName: "Pine Ridge",
+          layoutId: 20,
+          layoutName: "Red",
+        },
+      ],
+    });
+    renderPage();
+
+    await screen.findByText("Recent courses");
+    expect(
+      screen.getByRole("button", { name: "Maple Hill — Blue" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Pine Ridge — Red" }),
+    ).toBeInTheDocument();
+  });
+
+  it("selects a recent course's specific layout in one click", async () => {
+    mockClaimedPlayer();
+    vi.mocked(coursesApi.listCourses).mockResolvedValue({
+      courses: [{ id: 1, name: "Maple Hill", createdAt: "", layoutCount: 2 }],
+    });
+    vi.mocked(coursesApi.getCourse).mockResolvedValue({
+      id: 1,
+      name: "Maple Hill",
+      createdAt: "",
+      layouts: [
+        { id: 10, name: "Blue", createdAt: "", holes: [] },
+        { id: 11, name: "Gold", createdAt: "", holes: [] },
+      ],
+    });
+    vi.mocked(playersApi.getRecentCourses).mockResolvedValue({
+      recentCourses: [
+        {
+          courseId: 1,
+          courseName: "Maple Hill",
+          layoutId: 11,
+          layoutName: "Gold",
+        },
+      ],
+    });
+    vi.mocked(roundsApi.createRound).mockResolvedValue({
+      id: 5,
+      createdAt: "",
+      completedAt: null,
+      counting: true,
+      course: { id: 1, name: "Maple Hill" },
+      layout: { id: 11, name: "Gold" },
+      holes: [],
+      players: [],
+      scores: [],
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Maple Hill — Gold" }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /start round/i }),
+      ).toBeEnabled();
+    });
+
+    await user.click(screen.getByRole("button", { name: /start round/i }));
+    await waitFor(() => {
+      expect(roundsApi.createRound).toHaveBeenCalledWith(
+        { courseId: 1, layoutId: 11, playerIds: [1] },
+        expect.any(String),
+      );
+    });
   });
 });

@@ -209,6 +209,50 @@ playersRoute.get("/:playerId/layouts", async (c) => {
   });
 });
 
+const RECENT_COURSES_LIMIT = 3;
+
+playersRoute.get("/:playerId/recent-courses", async (c) => {
+  const playerId = parseIntParam(c.req.param("playerId"));
+  if (playerId === null) {
+    return c.json({ error: "Invalid player id" }, 400);
+  }
+
+  const player = await c.env.DB.prepare("SELECT id FROM players WHERE id = ?")
+    .bind(playerId)
+    .first();
+  if (!player) {
+    return c.json({ error: "Player not found" }, 404);
+  }
+
+  // Ordered by the most recent round's id (not created_at, which only has
+  // second-level resolution and can tie for rounds started close together)
+  // for each distinct course/layout the player has ever started a round on.
+  const { results } = await c.env.DB.prepare(
+    `SELECT courses.id AS course_id, courses.name AS course_name,
+            layouts.id AS layout_id, layouts.name AS layout_name,
+            MAX(rounds.id) AS last_round_id
+     FROM rounds
+     JOIN round_players ON round_players.round_id = rounds.id
+     JOIN courses ON courses.id = rounds.course_id
+     JOIN layouts ON layouts.id = rounds.layout_id
+     WHERE round_players.player_id = ?
+     GROUP BY courses.id, layouts.id
+     ORDER BY last_round_id DESC
+     LIMIT ?`,
+  )
+    .bind(playerId, RECENT_COURSES_LIMIT)
+    .all<PlayedLayoutRow & { last_round_id: number }>();
+
+  return c.json({
+    recentCourses: results.map((row) => ({
+      courseId: row.course_id,
+      courseName: row.course_name,
+      layoutId: row.layout_id,
+      layoutName: row.layout_name,
+    })),
+  });
+});
+
 playersRoute.get("/:playerId/stats", async (c) => {
   const playerId = parseIntParam(c.req.param("playerId"));
   if (playerId === null) {

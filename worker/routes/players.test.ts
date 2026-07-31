@@ -527,8 +527,129 @@ describe("player stats", () => {
     expect(holes).toHaveLength(0);
   });
 
+  it("returns the 3 most recently played courses, most recent first", async () => {
+    const player = await json<{ id: number }>(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+    );
+
+    const courseA = await setUpCourseWithOneHole();
+    const courseB = await seedCourse(env, {
+      courseName: "Pine Ridge",
+      layoutName: "Red",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const courseC = await seedCourse(env, {
+      courseName: "Oak Grove",
+      layoutName: "Gold",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const courseD = await seedCourse(env, {
+      courseName: "Cedar Park",
+      layoutName: "White",
+      holes: [{ number: 1, par: 3 }],
+    });
+
+    // Played in this order: A (oldest), B, C, D (most recent).
+    await playRound(courseA.courseId, courseA.layoutId, player.id, 3);
+    await playRound(courseB.courseId, courseB.layoutId, player.id, 3);
+    await playRound(courseC.courseId, courseC.layoutId, player.id, 3);
+    await playRound(courseD.courseId, courseD.layoutId, player.id, 3);
+
+    const { recentCourses } = await json<{
+      recentCourses: Array<{ courseName: string; layoutName: string }>;
+    }>(await request(`/api/players/${player.id}/recent-courses`));
+
+    expect(recentCourses).toEqual([
+      {
+        courseId: courseD.courseId,
+        courseName: "Cedar Park",
+        layoutId: courseD.layoutId,
+        layoutName: "White",
+      },
+      {
+        courseId: courseC.courseId,
+        courseName: "Oak Grove",
+        layoutId: courseC.layoutId,
+        layoutName: "Gold",
+      },
+      {
+        courseId: courseB.courseId,
+        courseName: "Pine Ridge",
+        layoutId: courseB.layoutId,
+        layoutName: "Red",
+      },
+    ]);
+  });
+
+  it("dedupes repeated rounds on the same course/layout into one recent entry", async () => {
+    const { courseId, layoutId } = await setUpCourseWithOneHole();
+    const player = await json<{ id: number }>(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+    );
+
+    await playRound(courseId, layoutId, player.id, 3);
+    await playRound(courseId, layoutId, player.id, 4);
+
+    const { recentCourses } = await json<{ recentCourses: unknown[] }>(
+      await request(`/api/players/${player.id}/recent-courses`),
+    );
+    expect(recentCourses).toHaveLength(1);
+  });
+
+  it("includes in-progress and non-counting rounds in recent courses", async () => {
+    const { courseId, layoutId } = await setUpCourseWithOneHole();
+    const player = await json<{ id: number }>(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+    );
+
+    // Neither completed nor marked counting — still a course the player
+    // recently started a round on, which is what this shortcut is for.
+    await request("/api/rounds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courseId, layoutId, playerIds: [player.id] }),
+    });
+
+    const { recentCourses } = await json<{ recentCourses: unknown[] }>(
+      await request(`/api/players/${player.id}/recent-courses`),
+    );
+    expect(recentCourses).toHaveLength(1);
+  });
+
+  it("returns an empty list for a player with no rounds", async () => {
+    const player = await json<{ id: number }>(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+    );
+
+    const { recentCourses } = await json<{ recentCourses: unknown[] }>(
+      await request(`/api/players/${player.id}/recent-courses`),
+    );
+    expect(recentCourses).toEqual([]);
+  });
+
   it("404s for a player that doesn't exist", async () => {
     const res = await request("/api/players/999/layouts");
+    expect(res.status).toBe(404);
+  });
+
+  it("404s fetching recent courses for a player that doesn't exist", async () => {
+    const res = await request("/api/players/999/recent-courses");
     expect(res.status).toBe(404);
   });
 

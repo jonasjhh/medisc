@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
@@ -17,8 +17,8 @@ import Typography from "@mui/material/Typography";
 import { getCourse, listCourses } from "../courses/api";
 import type { CourseDetail, CourseSummary } from "../courses/api";
 import { AddPlayerForm } from "../players/AddPlayerForm";
-import { listPlayers } from "../players/api";
-import type { Player } from "../players/api";
+import { getRecentCourses, listPlayers } from "../players/api";
+import type { Player, PlayedLayout } from "../players/api";
 import { createRound } from "./api";
 import { useIdentity } from "../identity/IdentityContext";
 import type { Status } from "../shared/status";
@@ -36,6 +36,11 @@ export function NewRoundPage() {
   const [selectedCourseId, setSelectedCourseId] = useState<number | "">("");
   const [courseDetail, setCourseDetail] = useState<CourseDetail | null>(null);
   const [selectedLayoutId, setSelectedLayoutId] = useState<number | "">("");
+  const [recentCourses, setRecentCourses] = useState<PlayedLayout[]>([]);
+  // Set right before changing selectedCourseId from a recent-course click, so
+  // the course-detail effect below can select that specific layout instead
+  // of defaulting to the course's first one.
+  const pendingLayoutIdRef = useRef<number | null>(null);
 
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +73,16 @@ export function NewRoundPage() {
       try {
         const detail = await getCourse(selectedCourseId);
         setCourseDetail(detail);
-        setSelectedLayoutId(detail.layouts[0]?.id ?? "");
+        const pendingLayoutId = pendingLayoutIdRef.current;
+        pendingLayoutIdRef.current = null;
+        const pendingLayoutExists = detail.layouts.some(
+          (layout) => layout.id === pendingLayoutId,
+        );
+        setSelectedLayoutId(
+          pendingLayoutExists
+            ? pendingLayoutId!
+            : (detail.layouts[0]?.id ?? ""),
+        );
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load course");
       }
@@ -84,6 +98,24 @@ export function NewRoundPage() {
       prev.has(claimedPlayerId) ? prev : new Set(prev).add(claimedPlayerId),
     );
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.claimedPlayer) {
+      setRecentCourses([]);
+      return;
+    }
+    void (async () => {
+      const { recentCourses: fetched } = await getRecentCourses(
+        user.claimedPlayer!.id,
+      );
+      setRecentCourses(fetched);
+    })();
+  }, [user]);
+
+  const selectRecentCourse = (recent: PlayedLayout) => {
+    pendingLayoutIdRef.current = recent.layoutId;
+    setSelectedCourseId(recent.courseId);
+  };
 
   const togglePlayer = (id: number) => {
     setSelectedPlayerIds((prev) => {
@@ -189,6 +221,26 @@ export function NewRoundPage() {
             <AddPlayerForm onAdded={handlePlayerAdded} />
           </Stack>
         </Paper>
+
+        {recentCourses.length > 0 && (
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+              Recent courses
+            </Typography>
+            <Stack direction="row" flexWrap="wrap" gap={1}>
+              {recentCourses.map((recent) => (
+                <Button
+                  key={`${recent.courseId}-${recent.layoutId}`}
+                  size="small"
+                  variant="outlined"
+                  onClick={() => selectRecentCourse(recent)}
+                >
+                  {recent.courseName} — {recent.layoutName}
+                </Button>
+              ))}
+            </Stack>
+          </Paper>
+        )}
 
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Typography variant="subtitle1" fontWeight={600} gutterBottom>

@@ -56,6 +56,12 @@ export function getPlayerLayouts(
   return request(`/api/players/${playerId}/layouts`);
 }
 
+export function getRecentCourses(
+  playerId: number,
+): Promise<{ recentCourses: PlayedLayout[] }> {
+  return request(`/api/players/${playerId}/recent-courses`);
+}
+
 export function getPlayerStats(
   playerId: number,
   layoutId: number,

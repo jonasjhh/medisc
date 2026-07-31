@@ -5,6 +5,7 @@ import {
   deletePlayer,
   getPlayerLayouts,
   getPlayerStats,
+  getRecentCourses,
   listPlayers,
   updatePlayer,
 } from "./api";
@@ -90,6 +91,25 @@ describe("players api", () => {
     expect(layouts).toHaveLength(1);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/players/1/layouts",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+  });
+
+  it("gets a player's recent courses", async () => {
+    const fetchMock = mockFetchOnce({
+      recentCourses: [
+        {
+          courseId: 1,
+          courseName: "Maple Hill",
+          layoutId: 2,
+          layoutName: "Blue",
+        },
+      ],
+    });
+    const { recentCourses } = await getRecentCourses(1);
+    expect(recentCourses).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/players/1/recent-courses",
       expect.objectContaining({ headers: expect.any(Headers) }),
     );
   });
