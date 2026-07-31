@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -282,37 +282,6 @@ describe("RoundPage", () => {
     expect(
       screen.queryByRole("button", { name: "Birdie" }),
     ).not.toBeInTheDocument();
-  });
-
-  it("deletes the round after confirming in the dialog", async () => {
-    vi.mocked(roundsApi.deleteRound).mockResolvedValue(undefined);
-    const user = userEvent.setup();
-    renderPage();
-
-    await screen.findByText("Hole 1");
-    await user.click(screen.getByRole("button", { name: /delete round/i }));
-
-    const dialog = await screen.findByRole("dialog");
-    await user.click(within(dialog).getByRole("button", { name: /delete/i }));
-
-    expect(roundsApi.deleteRound).toHaveBeenCalledWith(1);
-    expect(await screen.findByText("Rounds list page")).toBeInTheDocument();
-  });
-
-  it("cancels round deletion without calling the API", async () => {
-    const user = userEvent.setup();
-    renderPage();
-
-    await screen.findByText("Hole 1");
-    await user.click(screen.getByRole("button", { name: /delete round/i }));
-
-    const dialog = await screen.findByRole("dialog");
-    await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
-
-    expect(roundsApi.deleteRound).not.toHaveBeenCalled();
-    await waitFor(() =>
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
-    );
   });
 
   it("swaps a single player with the standalone swap button", async () => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
+import { Link as RouterLink, useParams } from "react-router-dom";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
@@ -10,11 +10,6 @@ import Checkbox from "@mui/material/Checkbox";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogTitle from "@mui/material/DialogTitle";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import FormGroup from "@mui/material/FormGroup";
 import IconButton from "@mui/material/IconButton";
@@ -36,7 +31,6 @@ import { listPlayers } from "../players/api";
 import type { Player } from "../players/api";
 import {
   completeRound,
-  deleteRound,
   getRound,
   reopenRound,
   updateHoleScore,
@@ -66,7 +60,6 @@ type Field = "strokes" | "penalties";
 export function RoundPage() {
   const { roundId } = useParams();
   const id = Number(roundId);
-  const navigate = useNavigate();
 
   const [round, setRound] = useState<RoundDetail | null>(null);
   const [status, setStatus] = useState<Status>("loading");
@@ -88,9 +81,6 @@ export function RoundPage() {
     player: RoundPlayer;
   } | null>(null);
   const [swapping, setSwapping] = useState(false);
-
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -189,19 +179,6 @@ export function RoundPage() {
       setError(err instanceof Error ? err.message : "Failed to update round");
     } finally {
       setTogglingCounting(false);
-    }
-  };
-
-  const handleDeleteRound = async () => {
-    setDeleting(true);
-    setError(null);
-    try {
-      await deleteRound(id);
-      navigate("/rounds");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete round");
-      setDeleting(false);
-      setDeleteDialogOpen(false);
     }
   };
 
@@ -655,38 +632,6 @@ export function RoundPage() {
           {error}
         </Alert>
       )}
-
-      <Button
-        color="error"
-        variant="outlined"
-        sx={{ mt: 4 }}
-        onClick={() => setDeleteDialogOpen(true)}
-      >
-        Delete round
-      </Button>
-
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-      >
-        <DialogTitle>Delete this round?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            This permanently removes {round.course.name} — {round.layout.name}{" "}
-            and every score recorded for it. This can't be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button
-            color="error"
-            disabled={deleting}
-            onClick={() => void handleDeleteRound()}
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Container>
   );
 }
