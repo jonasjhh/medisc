@@ -29,7 +29,8 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { listPlayers } from "../players/api";
 import type { Player } from "../players/api";
-import { chunk } from "../shared/chunk";
+import { chunk, HOLES_PER_GROUP } from "../shared/chunk";
+import type { Status } from "../shared/status";
 import {
   completeRound,
   getRound,
@@ -41,8 +42,6 @@ import type { RoundDetail, RoundHole, RoundPlayer, RoundScore } from "./api";
 import { ScoreAdjuster } from "./ScoreAdjuster";
 import { ScoreBadge } from "./ScoreBadge";
 import { scoreOutcome } from "./scoreColor";
-
-const HOLES_PER_GROUP = 9;
 
 const outcomeButtonColor = {
   birdie: "success",
@@ -161,7 +160,6 @@ function ScorecardGroupTable({
   );
 }
 
-type Status = "loading" | "ready" | "error";
 type Field = "strokes" | "penalties";
 
 export function RoundPage() {

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types";
 import { createRoundSchema, updateRoundSchema } from "../schemas";
+import { parseIntParam } from "../params";
 
 interface RoundRow {
   id: number;
@@ -114,6 +115,33 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
   };
 }
 
+async function allPlayersExist(db: D1Database, playerIds: number[]) {
+  const placeholders = playerIds.map(() => "?").join(",");
+  const { results } = await db
+    .prepare(`SELECT id FROM players WHERE id IN (${placeholders})`)
+    .bind(...playerIds)
+    .all();
+  return results.length === playerIds.length;
+}
+
+function parScoreInsertStatements(
+  db: D1Database,
+  roundId: number,
+  playerIds: number[],
+  holes: { id: number; par: number }[],
+) {
+  return playerIds.flatMap((playerId) =>
+    holes.map((hole) =>
+      db
+        .prepare(
+          `INSERT INTO hole_scores (round_id, player_id, hole_id, strokes, penalties, recorded)
+           VALUES (?, ?, ?, ?, 0, 0)`,
+        )
+        .bind(roundId, playerId, hole.id, hole.par),
+    ),
+  );
+}
+
 export const roundsRoute = new Hono<AppEnv>();
 
 roundsRoute.post("/", async (c) => {
@@ -138,13 +166,7 @@ roundsRoute.post("/", async (c) => {
     );
   }
 
-  const placeholders = uniquePlayerIds.map(() => "?").join(",");
-  const { results: existingPlayers } = await c.env.DB.prepare(
-    `SELECT id FROM players WHERE id IN (${placeholders})`,
-  )
-    .bind(...uniquePlayerIds)
-    .all();
-  if (existingPlayers.length !== uniquePlayerIds.length) {
+  if (!(await allPlayersExist(c.env.DB, uniquePlayerIds))) {
     return c.json({ error: "One or more players were not found" }, 404);
   }
 
@@ -167,14 +189,7 @@ roundsRoute.post("/", async (c) => {
         "INSERT INTO round_players (round_id, player_id) VALUES (?, ?)",
       ).bind(roundId, playerId),
     ),
-    ...uniquePlayerIds.flatMap((playerId) =>
-      holes.map((hole) =>
-        c.env.DB.prepare(
-          `INSERT INTO hole_scores (round_id, player_id, hole_id, strokes, penalties, recorded)
-           VALUES (?, ?, ?, ?, 0, 0)`,
-        ).bind(roundId, playerId, hole.id, hole.par),
-      ),
-    ),
+    ...parScoreInsertStatements(c.env.DB, roundId, uniquePlayerIds, holes),
   ];
   await c.env.DB.batch(statements);
 
@@ -240,8 +255,8 @@ roundsRoute.get("/", async (c) => {
 });
 
 roundsRoute.get("/:roundId", async (c) => {
-  const roundId = Number(c.req.param("roundId"));
-  if (!Number.isInteger(roundId)) {
+  const roundId = parseIntParam(c.req.param("roundId"));
+  if (roundId === null) {
     return c.json({ error: "Invalid round id" }, 400);
   }
 
@@ -254,8 +269,8 @@ roundsRoute.get("/:roundId", async (c) => {
 });
 
 roundsRoute.patch("/:roundId", async (c) => {
-  const roundId = Number(c.req.param("roundId"));
-  if (!Number.isInteger(roundId)) {
+  const roundId = parseIntParam(c.req.param("roundId"));
+  if (roundId === null) {
     return c.json({ error: "Invalid round id" }, 400);
   }
 
@@ -266,10 +281,10 @@ roundsRoute.patch("/:roundId", async (c) => {
   }
 
   const round = await c.env.DB.prepare(
-    "SELECT id, layout_id, completed_at FROM rounds WHERE id = ?",
+    "SELECT layout_id, completed_at FROM rounds WHERE id = ?",
   )
     .bind(roundId)
-    .first<{ id: number; layout_id: number; completed_at: string | null }>();
+    .first<{ layout_id: number; completed_at: string | null }>();
   if (!round) {
     return c.json({ error: "Round not found" }, 404);
   }
@@ -285,13 +300,7 @@ roundsRoute.patch("/:roundId", async (c) => {
     }
 
     const uniquePlayerIds = [...new Set(playerIds)];
-    const placeholders = uniquePlayerIds.map(() => "?").join(",");
-    const { results: existingPlayers } = await c.env.DB.prepare(
-      `SELECT id FROM players WHERE id IN (${placeholders})`,
-    )
-      .bind(...uniquePlayerIds)
-      .all();
-    if (existingPlayers.length !== uniquePlayerIds.length) {
+    if (!(await allPlayersExist(c.env.DB, uniquePlayerIds))) {
       return c.json({ error: "One or more players were not found" }, 404);
     }
 
@@ -328,14 +337,7 @@ roundsRoute.patch("/:roundId", async (c) => {
           "INSERT INTO round_players (round_id, player_id) VALUES (?, ?)",
         ).bind(roundId, playerId),
       ),
-      ...toAdd.flatMap((playerId) =>
-        holes.map((hole) =>
-          c.env.DB.prepare(
-            `INSERT INTO hole_scores (round_id, player_id, hole_id, strokes, penalties, recorded)
-             VALUES (?, ?, ?, ?, 0, 0)`,
-          ).bind(roundId, playerId, hole.id, hole.par),
-        ),
-      ),
+      ...parScoreInsertStatements(c.env.DB, roundId, toAdd, holes),
     ];
     if (statements.length > 0) {
       await c.env.DB.batch(statements);
@@ -353,8 +355,8 @@ roundsRoute.patch("/:roundId", async (c) => {
 });
 
 roundsRoute.post("/:roundId/complete", async (c) => {
-  const roundId = Number(c.req.param("roundId"));
-  if (!Number.isInteger(roundId)) {
+  const roundId = parseIntParam(c.req.param("roundId"));
+  if (roundId === null) {
     return c.json({ error: "Invalid round id" }, 400);
   }
 
@@ -376,8 +378,8 @@ roundsRoute.post("/:roundId/complete", async (c) => {
 });
 
 roundsRoute.delete("/:roundId", async (c) => {
-  const roundId = Number(c.req.param("roundId"));
-  if (!Number.isInteger(roundId)) {
+  const roundId = parseIntParam(c.req.param("roundId"));
+  if (roundId === null) {
     return c.json({ error: "Invalid round id" }, 400);
   }
 
@@ -402,8 +404,8 @@ roundsRoute.delete("/:roundId", async (c) => {
 });
 
 roundsRoute.post("/:roundId/reopen", async (c) => {
-  const roundId = Number(c.req.param("roundId"));
-  if (!Number.isInteger(roundId)) {
+  const roundId = parseIntParam(c.req.param("roundId"));
+  if (roundId === null) {
     return c.json({ error: "Invalid round id" }, 400);
   }
 

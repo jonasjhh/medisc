@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink, useParams } from "react-router-dom";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
 import FormControl from "@mui/material/FormControl";
@@ -20,9 +19,9 @@ import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import { getPlayerLayouts, getPlayerStats, listPlayers } from "./api";
 import type { HoleStat, Player, PlayedLayout } from "./api";
+import { ClaimedStatusChip } from "./ClaimedStatusChip";
 import { useIdentity } from "../identity/IdentityContext";
-
-type Status = "loading" | "ready" | "error";
+import type { Status } from "../shared/status";
 
 export function PlayerStatsPage() {
   const { playerId } = useParams();
@@ -88,21 +87,9 @@ export function PlayerStatsPage() {
               {player?.name ?? "Player"}
             </Typography>
             {player && (
-              <Chip
-                size="small"
-                label={
-                  player.claimedByUserId === user?.id
-                    ? "You"
-                    : player.claimedByUserId !== null
-                      ? "Claimed"
-                      : "Guest"
-                }
-                color={
-                  player.claimedByUserId === user?.id ? "primary" : "default"
-                }
-                variant={
-                  player.claimedByUserId === user?.id ? "filled" : "outlined"
-                }
+              <ClaimedStatusChip
+                claimedByUserId={player.claimedByUserId}
+                currentUserId={user?.id}
               />
             )}
           </Stack>

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types";
+import { parseIntParam } from "../params";
 
 interface CourseRow {
   id: number;
@@ -13,7 +14,6 @@ interface CourseListRow extends CourseRow {
 
 interface LayoutRow {
   id: number;
-  course_id: number;
   name: string;
   created_at: string;
 }
@@ -49,8 +49,8 @@ coursesRoute.get("/", async (c) => {
 });
 
 coursesRoute.get("/:courseId", async (c) => {
-  const courseId = Number(c.req.param("courseId"));
-  if (!Number.isInteger(courseId)) {
+  const courseId = parseIntParam(c.req.param("courseId"));
+  if (courseId === null) {
     return c.json({ error: "Invalid course id" }, 400);
   }
 
@@ -65,7 +65,7 @@ coursesRoute.get("/:courseId", async (c) => {
   }
 
   const { results: layoutRows } = await c.env.DB.prepare(
-    "SELECT id, course_id, name, created_at FROM layouts WHERE course_id = ? ORDER BY id",
+    "SELECT id, name, created_at FROM layouts WHERE course_id = ? ORDER BY id",
   )
     .bind(courseId)
     .all<LayoutRow>();

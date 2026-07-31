@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types";
 import { updateHoleScoreSchema } from "../schemas";
+import { parseIntParam } from "../params";
 
 interface HoleScoreRow {
   id: number;
@@ -15,8 +16,8 @@ interface HoleScoreRow {
 export const holeScoresRoute = new Hono<AppEnv>();
 
 holeScoresRoute.patch("/:id", async (c) => {
-  const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id)) {
+  const id = parseIntParam(c.req.param("id"));
+  if (id === null) {
     return c.json({ error: "Invalid hole score id" }, 400);
   }
 
@@ -27,7 +28,7 @@ holeScoresRoute.patch("/:id", async (c) => {
   }
 
   const existing = await c.env.DB.prepare(
-    `SELECT hole_scores.id, hole_scores.strokes, hole_scores.penalties,
+    `SELECT hole_scores.strokes, hole_scores.penalties,
             rounds.completed_at
      FROM hole_scores
      JOIN rounds ON rounds.id = hole_scores.round_id
@@ -35,7 +36,6 @@ holeScoresRoute.patch("/:id", async (c) => {
   )
     .bind(id)
     .first<{
-      id: number;
       strokes: number;
       penalties: number;
       completed_at: string | null;

@@ -6,10 +6,8 @@ import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
-import { chunk } from "../shared/chunk";
+import { chunk, HOLES_PER_GROUP } from "../shared/chunk";
 import type { Hole, Layout } from "./api";
-
-const HOLES_PER_GROUP = 9;
 
 function HoleGroupTable({
   holes,

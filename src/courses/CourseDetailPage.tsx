@@ -8,8 +8,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { getCourse, type CourseDetail } from "./api";
 import { LayoutCard } from "./LayoutCard";
-
-type Status = "loading" | "ready" | "error";
+import type { Status } from "../shared/status";
 
 export function CourseDetailPage() {
   const { courseId } = useParams();

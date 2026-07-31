@@ -6,11 +6,6 @@ import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogTitle from "@mui/material/DialogTitle";
 import FormControl from "@mui/material/FormControl";
 import IconButton from "@mui/material/IconButton";
 import InputLabel from "@mui/material/InputLabel";
@@ -29,8 +24,8 @@ import { listPlayers } from "../players/api";
 import type { Player } from "../players/api";
 import { deleteRound, listRounds } from "./api";
 import type { RoundFilters, RoundSummary } from "./api";
-
-type Status = "loading" | "ready" | "error";
+import { ConfirmDeleteDialog } from "../shared/ConfirmDeleteDialog";
+import type { Status } from "../shared/status";
 
 export function RoundsListPage() {
   const [rounds, setRounds] = useState<RoundSummary[]>([]);
@@ -223,13 +218,11 @@ export function RoundsListPage() {
         </List>
       )}
 
-      <Dialog
+      <ConfirmDeleteDialog
         open={deleteTarget !== null}
-        onClose={() => setDeleteTarget(null)}
-      >
-        <DialogTitle>Delete this round?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
+        title="Delete this round?"
+        description={
+          <>
             This permanently removes{" "}
             {deleteTarget && (
               <>
@@ -237,19 +230,12 @@ export function RoundsListPage() {
               </>
             )}{" "}
             and every score recorded for it. This can't be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
-          <Button
-            color="error"
-            disabled={deleting}
-            onClick={() => void handleDelete()}
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+          </>
+        }
+        confirming={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void handleDelete()}
+      />
     </Container>
   );
 }

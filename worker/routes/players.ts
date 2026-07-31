@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types";
 import { createPlayerSchema, updatePlayerSchema } from "../schemas";
+import { parseIntParam } from "../params";
 
 interface PlayerRow {
   id: number;
@@ -41,6 +42,16 @@ async function countPlayerRounds(db: D1Database, playerId: number) {
   return row!.round_count;
 }
 
+function serializePlayer(row: PlayerRow, roundCount: number) {
+  return {
+    id: row.id,
+    name: row.name,
+    createdAt: row.created_at,
+    roundCount,
+    claimedByUserId: row.claimed_by_user_id,
+  };
+}
+
 export const playersRoute = new Hono<AppEnv>();
 
 playersRoute.post("/", async (c) => {
@@ -56,16 +67,7 @@ playersRoute.post("/", async (c) => {
     .bind(parsed.data.name)
     .first<PlayerRow>();
 
-  return c.json(
-    {
-      id: row!.id,
-      name: row!.name,
-      createdAt: row!.created_at,
-      roundCount: 0,
-      claimedByUserId: row!.claimed_by_user_id,
-    },
-    201,
-  );
+  return c.json(serializePlayer(row!, 0), 201);
 });
 
 playersRoute.get("/", async (c) => {
@@ -93,8 +95,8 @@ playersRoute.get("/", async (c) => {
 });
 
 playersRoute.patch("/:playerId", async (c) => {
-  const playerId = Number(c.req.param("playerId"));
-  if (!Number.isInteger(playerId)) {
+  const playerId = parseIntParam(c.req.param("playerId"));
+  if (playerId === null) {
     return c.json({ error: "Invalid player id" }, 400);
   }
 
@@ -105,10 +107,10 @@ playersRoute.patch("/:playerId", async (c) => {
   }
 
   const existing = await c.env.DB.prepare(
-    "SELECT id, claimed_by_user_id FROM players WHERE id = ?",
+    "SELECT claimed_by_user_id FROM players WHERE id = ?",
   )
     .bind(playerId)
-    .first<{ id: number; claimed_by_user_id: number | null }>();
+    .first<{ claimed_by_user_id: number | null }>();
   if (!existing) {
     return c.json({ error: "Player not found" }, 404);
   }
@@ -131,26 +133,20 @@ playersRoute.patch("/:playerId", async (c) => {
 
   const roundCount = await countPlayerRounds(c.env.DB, playerId);
 
-  return c.json({
-    id: row!.id,
-    name: row!.name,
-    createdAt: row!.created_at,
-    roundCount,
-    claimedByUserId: row!.claimed_by_user_id,
-  });
+  return c.json(serializePlayer(row!, roundCount));
 });
 
 playersRoute.delete("/:playerId", async (c) => {
-  const playerId = Number(c.req.param("playerId"));
-  if (!Number.isInteger(playerId)) {
+  const playerId = parseIntParam(c.req.param("playerId"));
+  if (playerId === null) {
     return c.json({ error: "Invalid player id" }, 400);
   }
 
   const existing = await c.env.DB.prepare(
-    "SELECT id, claimed_by_user_id FROM players WHERE id = ?",
+    "SELECT claimed_by_user_id FROM players WHERE id = ?",
   )
     .bind(playerId)
-    .first<{ id: number; claimed_by_user_id: number | null }>();
+    .first<{ claimed_by_user_id: number | null }>();
   if (!existing) {
     return c.json({ error: "Player not found" }, 404);
   }
@@ -176,8 +172,8 @@ playersRoute.delete("/:playerId", async (c) => {
 });
 
 playersRoute.get("/:playerId/layouts", async (c) => {
-  const playerId = Number(c.req.param("playerId"));
-  if (!Number.isInteger(playerId)) {
+  const playerId = parseIntParam(c.req.param("playerId"));
+  if (playerId === null) {
     return c.json({ error: "Invalid player id" }, 400);
   }
 
@@ -212,13 +208,13 @@ playersRoute.get("/:playerId/layouts", async (c) => {
 });
 
 playersRoute.get("/:playerId/stats", async (c) => {
-  const playerId = Number(c.req.param("playerId"));
-  if (!Number.isInteger(playerId)) {
+  const playerId = parseIntParam(c.req.param("playerId"));
+  if (playerId === null) {
     return c.json({ error: "Invalid player id" }, 400);
   }
 
-  const layoutId = Number(c.req.query("layoutId"));
-  if (!Number.isInteger(layoutId)) {
+  const layoutId = parseIntParam(c.req.query("layoutId"));
+  if (layoutId === null) {
     return c.json({ error: "layoutId query parameter is required" }, 400);
   }
 
@@ -263,8 +259,8 @@ playersRoute.get("/:playerId/stats", async (c) => {
 });
 
 playersRoute.post("/:playerId/claim", async (c) => {
-  const playerId = Number(c.req.param("playerId"));
-  if (!Number.isInteger(playerId)) {
+  const playerId = parseIntParam(c.req.param("playerId"));
+  if (playerId === null) {
     return c.json({ error: "Invalid player id" }, 400);
   }
 
@@ -274,10 +270,10 @@ playersRoute.post("/:playerId/claim", async (c) => {
   }
 
   const player = await c.env.DB.prepare(
-    "SELECT id, claimed_by_user_id FROM players WHERE id = ?",
+    "SELECT claimed_by_user_id FROM players WHERE id = ?",
   )
     .bind(playerId)
-    .first<{ id: number; claimed_by_user_id: number | null }>();
+    .first<{ claimed_by_user_id: number | null }>();
   if (!player) {
     return c.json({ error: "Player not found" }, 404);
   }
@@ -313,11 +309,5 @@ playersRoute.post("/:playerId/claim", async (c) => {
     .bind(playerId)
     .first<PlayerRow>();
 
-  return c.json({
-    id: row!.id,
-    name: row!.name,
-    createdAt: row!.created_at,
-    roundCount,
-    claimedByUserId: row!.claimed_by_user_id,
-  });
+  return c.json(serializePlayer(row!, roundCount));
 });

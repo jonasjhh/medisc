@@ -6,15 +6,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogTitle from "@mui/material/DialogTitle";
 import IconButton from "@mui/material/IconButton";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -28,9 +21,10 @@ import Typography from "@mui/material/Typography";
 import { AddPlayerForm } from "./AddPlayerForm";
 import { deletePlayer, listPlayers, updatePlayer } from "./api";
 import type { Player } from "./api";
+import { ClaimedStatusChip } from "./ClaimedStatusChip";
 import { useIdentity } from "../identity/IdentityContext";
-
-type Status = "loading" | "ready" | "error";
+import { ConfirmDeleteDialog } from "../shared/ConfirmDeleteDialog";
+import type { Status } from "../shared/status";
 
 export function PlayersListPage() {
   const { user } = useIdentity();
@@ -85,20 +79,6 @@ export function PlayersListPage() {
 
   const canEdit = (player: Player) =>
     player.claimedByUserId === null || player.claimedByUserId === user?.id;
-
-  const statusChip = (player: Player) => {
-    const isMine = player.claimedByUserId === user?.id;
-    return (
-      <Chip
-        size="small"
-        label={
-          isMine ? "You" : player.claimedByUserId !== null ? "Claimed" : "Guest"
-        }
-        color={isMine ? "primary" : "default"}
-        variant={isMine ? "filled" : "outlined"}
-      />
-    );
-  };
 
   const handlePlayerAdded = (player: Player) => {
     setPlayers((prev) =>
@@ -234,7 +214,10 @@ export function PlayersListPage() {
                     primary={
                       <Stack direction="row" alignItems="center" spacing={1}>
                         <span>{player.name}</span>
-                        {statusChip(player)}
+                        <ClaimedStatusChip
+                          claimedByUserId={player.claimedByUserId}
+                          currentUserId={user?.id}
+                        />
                       </Stack>
                     }
                   />
@@ -250,27 +233,14 @@ export function PlayersListPage() {
         </List>
       )}
 
-      <Dialog
+      <ConfirmDeleteDialog
         open={deleteTarget !== null}
-        onClose={() => setDeleteTarget(null)}
-      >
-        <DialogTitle>Delete {deleteTarget?.name}?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            This removes them from the roster. This can't be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
-          <Button
-            color="error"
-            disabled={deleting}
-            onClick={() => void handleDelete()}
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+        title={`Delete ${deleteTarget?.name}?`}
+        description="This removes them from the roster. This can't be undone."
+        confirming={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void handleDelete()}
+      />
     </Container>
   );
 }

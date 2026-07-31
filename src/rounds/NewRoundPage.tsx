@@ -21,8 +21,7 @@ import { listPlayers } from "../players/api";
 import type { Player } from "../players/api";
 import { createRound } from "./api";
 import { useIdentity } from "../identity/IdentityContext";
-
-type Status = "loading" | "ready" | "error";
+import type { Status } from "../shared/status";
 
 export function NewRoundPage() {
   const navigate = useNavigate();
