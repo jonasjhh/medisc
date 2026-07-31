@@ -2,14 +2,10 @@ import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
+import { useTheme } from "@mui/material/styles";
 import Typography from "@mui/material/Typography";
+import { adjusterTextColors } from "./scoreColor";
 import type { ScoreOutcome } from "./scoreColor";
-
-const outcomeColor: Record<ScoreOutcome, string | undefined> = {
-  birdie: "success.main",
-  par: undefined,
-  bogey: "warning.main",
-};
 
 export function ScoreAdjuster({
   label,
@@ -30,6 +26,13 @@ export function ScoreAdjuster({
   outcome?: ScoreOutcome;
   recorded?: boolean;
 }) {
+  const theme = useTheme();
+  const mode = theme.palette.mode;
+  const color =
+    outcome && outcome !== "par"
+      ? adjusterTextColors[outcome][mode]
+      : undefined;
+
   return (
     <Box textAlign="center">
       <Typography variant="caption" color="text.secondary">
@@ -48,8 +51,7 @@ export function ScoreAdjuster({
         )}
         <Typography
           variant="h5"
-          sx={{ minWidth: 32, textAlign: "center" }}
-          color={outcome ? outcomeColor[outcome] : undefined}
+          sx={{ minWidth: 32, textAlign: "center", color }}
           fontWeight={outcome && outcome !== "par" ? 700 : undefined}
         >
           {recorded ? value : "-"}
