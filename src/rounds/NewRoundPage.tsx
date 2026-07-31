@@ -20,11 +20,13 @@ import { AddPlayerForm } from "../players/AddPlayerForm";
 import { listPlayers } from "../players/api";
 import type { Player } from "../players/api";
 import { createRound } from "./api";
+import { useIdentity } from "../identity/IdentityContext";
 
 type Status = "loading" | "ready" | "error";
 
 export function NewRoundPage() {
   const navigate = useNavigate();
+  const { user } = useIdentity();
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(
@@ -73,6 +75,16 @@ export function NewRoundPage() {
       }
     })();
   }, [selectedCourseId]);
+
+  useEffect(() => {
+    if (!user?.claimedPlayer) {
+      return;
+    }
+    const claimedPlayerId = user.claimedPlayer.id;
+    setSelectedPlayerIds((prev) =>
+      prev.has(claimedPlayerId) ? prev : new Set(prev).add(claimedPlayerId),
+    );
+  }, [user]);
 
   const togglePlayer = (id: number) => {
     setSelectedPlayerIds((prev) => {

@@ -6,10 +6,14 @@ import { NewRoundPage } from "./NewRoundPage";
 import * as coursesApi from "../courses/api";
 import * as playersApi from "../players/api";
 import * as roundsApi from "./api";
+import { IdentityProvider } from "../identity/IdentityContext";
+import * as identityApi from "../identity/api";
+import { InstallPromptProvider } from "../app/InstallPromptContext";
 
 vi.mock("../courses/api");
 vi.mock("../players/api");
 vi.mock("./api");
+vi.mock("../identity/api");
 
 describe("NewRoundPage", () => {
   beforeEach(() => {
@@ -33,15 +37,20 @@ describe("NewRoundPage", () => {
       createdAt: "",
       layouts: [{ id: 10, name: "Blue", createdAt: "", holes: [] }],
     });
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({ user: null });
   });
 
   function renderPage() {
     return render(
       <MemoryRouter initialEntries={["/rounds/new"]}>
-        <Routes>
-          <Route path="/rounds/new" element={<NewRoundPage />} />
-          <Route path="/rounds/:roundId" element={<div>Round page</div>} />
-        </Routes>
+        <InstallPromptProvider>
+          <IdentityProvider>
+            <Routes>
+              <Route path="/rounds/new" element={<NewRoundPage />} />
+              <Route path="/rounds/:roundId" element={<div>Round page</div>} />
+            </Routes>
+          </IdentityProvider>
+        </InstallPromptProvider>
       </MemoryRouter>,
     );
   }
@@ -106,5 +115,39 @@ describe("NewRoundPage", () => {
     renderPage();
     await screen.findByText("Alice");
     expect(screen.getByRole("button", { name: /start round/i })).toBeDisabled();
+  });
+
+  it("pre-selects the claimed player, leaving other players unchecked", async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: 42,
+        },
+        {
+          id: 2,
+          name: "Bob",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: null,
+        },
+      ],
+    });
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({
+      user: {
+        id: 42,
+        createdAt: "",
+        claimedPlayer: { id: 1, name: "Alice" },
+      },
+    });
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Alice")).toBeChecked();
+    });
+    expect(screen.getByLabelText("Bob")).not.toBeChecked();
   });
 });
