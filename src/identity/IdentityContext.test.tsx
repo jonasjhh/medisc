@@ -64,6 +64,15 @@ describe("IdentityContext", () => {
     expect(screen.getByTestId("onboarding-open")).toHaveTextContent("false");
   });
 
+  it("does not auto-open onboarding when the identity fetch fails", async () => {
+    vi.mocked(identityApi.getCurrentUser).mockRejectedValue(
+      new Error("network error"),
+    );
+    renderConsumer();
+    expect(await screen.findByTestId("status")).toHaveTextContent("ready");
+    expect(screen.getByTestId("onboarding-open")).toHaveTextContent("false");
+  });
+
   it("sets the dismissed flag when closeOnboarding is called", async () => {
     vi.mocked(identityApi.getCurrentUser).mockResolvedValue({ user: null });
     const user = userEvent.setup();
