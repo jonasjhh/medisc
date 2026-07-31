@@ -18,11 +18,21 @@ function HoleGroupTable({
   holes: Hole[];
   caption: string;
 }) {
+  // Pad a short trailing group (e.g. 3 leftover holes) out to a full 9
+  // columns with blank cells, so its columns are sized the same as a
+  // complete group's and the real holes stay left-aligned instead of
+  // stretching to fill the row.
+  const padded: (Hole | null)[] = [...holes];
+  while (padded.length < HOLES_PER_GROUP) {
+    padded.push(null);
+  }
+
   return (
     <Table
       size="small"
       aria-label={caption}
       sx={{
+        width: "auto",
         "& td, & th": { px: 0.75, py: 0.25, fontSize: "0.8125rem" },
       }}
     >
@@ -31,9 +41,9 @@ function HoleGroupTable({
           <TableCell component="th" scope="row">
             Hole
           </TableCell>
-          {holes.map((hole) => (
-            <TableCell key={hole.id} align="center">
-              {hole.number}
+          {padded.map((hole, index) => (
+            <TableCell key={hole?.id ?? `pad-${index}`} align="center">
+              {hole?.number}
             </TableCell>
           ))}
         </TableRow>
@@ -41,9 +51,9 @@ function HoleGroupTable({
           <TableCell component="th" scope="row">
             Dist.
           </TableCell>
-          {holes.map((hole) => (
-            <TableCell key={hole.id} align="center">
-              {hole.distanceMeters ?? "—"}
+          {padded.map((hole, index) => (
+            <TableCell key={hole?.id ?? `pad-${index}`} align="center">
+              {hole ? (hole.distanceMeters ?? "—") : null}
             </TableCell>
           ))}
         </TableRow>
@@ -51,9 +61,9 @@ function HoleGroupTable({
           <TableCell component="th" scope="row">
             Par
           </TableCell>
-          {holes.map((hole) => (
-            <TableCell key={hole.id} align="center">
-              {hole.par}
+          {padded.map((hole, index) => (
+            <TableCell key={hole?.id ?? `pad-${index}`} align="center">
+              {hole?.par}
             </TableCell>
           ))}
         </TableRow>
