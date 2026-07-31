@@ -160,6 +160,37 @@ function ScorecardGroupTable({
   );
 }
 
+function StepNavButtons({
+  isFirstStep,
+  isLastStep,
+  onPrevious,
+  onNext,
+}: {
+  isFirstStep: boolean;
+  isLastStep: boolean;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <Stack direction="row" justifyContent="space-between" spacing={2}>
+      <Button
+        startIcon={<ArrowBackIcon />}
+        onClick={onPrevious}
+        disabled={isFirstStep}
+      >
+        Previous
+      </Button>
+      <Button
+        endIcon={<ArrowForwardIcon />}
+        onClick={onNext}
+        disabled={isLastStep}
+      >
+        Next
+      </Button>
+    </Stack>
+  );
+}
+
 type Field = "strokes" | "penalties";
 
 export function RoundPage() {
@@ -581,7 +612,7 @@ export function RoundPage() {
             const lastHole = holesSoFar[holesSoFar.length - 1];
             return (
               <Box textAlign="center">
-                <Typography variant="h4">Turn</Typography>
+                <Typography variant="h4">F{holesSoFar.length}</Typography>
                 <Typography color="text.secondary">
                   Par {parSoFar} through hole {lastHole.number}
                 </Typography>
@@ -623,6 +654,14 @@ export function RoundPage() {
               scoreByKey={scoreByKey}
             />
           ))}
+          <StepNavButtons
+            isFirstStep={isFirstStep}
+            isLastStep={isLastStep}
+            onPrevious={() => setStepIndex((index) => Math.max(0, index - 1))}
+            onNext={() =>
+              setStepIndex((index) => Math.min(steps.length - 1, index + 1))
+            }
+          />
         </Stack>
       ) : step.kind === "final" ? (
         <Stack spacing={2}>
@@ -717,24 +756,14 @@ export function RoundPage() {
             );
           })}
 
-          <Stack direction="row" justifyContent="space-between" spacing={2}>
-            <Button
-              startIcon={<ArrowBackIcon />}
-              onClick={() => setStepIndex((index) => Math.max(0, index - 1))}
-              disabled={isFirstStep}
-            >
-              Previous
-            </Button>
-            <Button
-              endIcon={<ArrowForwardIcon />}
-              onClick={() =>
-                setStepIndex((index) => Math.min(steps.length - 1, index + 1))
-              }
-              disabled={isLastStep}
-            >
-              Next
-            </Button>
-          </Stack>
+          <StepNavButtons
+            isFirstStep={isFirstStep}
+            isLastStep={isLastStep}
+            onPrevious={() => setStepIndex((index) => Math.max(0, index - 1))}
+            onNext={() =>
+              setStepIndex((index) => Math.min(steps.length - 1, index + 1))
+            }
+          />
         </Stack>
       )}
 

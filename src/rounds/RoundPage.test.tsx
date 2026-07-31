@@ -458,7 +458,7 @@ describe("RoundPage", () => {
     expect(await screen.findByText("Hole 2")).toBeInTheDocument();
   });
 
-  it("shows a Turn checkpoint after the front 9 with cumulative totals", async () => {
+  it("shows an F9 checkpoint after the front 9 with cumulative totals", async () => {
     vi.mocked(roundsApi.getRound).mockResolvedValue(twelveHoleRound);
     const user = userEvent.setup();
     renderPage();
@@ -468,7 +468,7 @@ describe("RoundPage", () => {
       await user.click(screen.getByRole("button", { name: /next hole/i }));
     }
 
-    expect(await screen.findByText("Turn")).toBeInTheDocument();
+    expect(await screen.findByText("F9")).toBeInTheDocument();
     expect(screen.getByText("Par 27 through hole 9")).toBeInTheDocument();
     expect(screen.getByText("Alice: 27 (E)")).toBeInTheDocument();
     expect(
@@ -482,7 +482,7 @@ describe("RoundPage", () => {
     expect(await screen.findByText("Hole 10")).toBeInTheDocument();
   });
 
-  it("shows bottom Previous/Next buttons only on hole steps", async () => {
+  it("shows bottom Previous/Next buttons on hole and checkpoint steps, but not on the final summary", async () => {
     const user = userEvent.setup();
     renderPage();
 
@@ -499,6 +499,22 @@ describe("RoundPage", () => {
     expect(
       screen.queryByRole("button", { name: "Next" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows bottom Previous/Next buttons on a checkpoint step", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue(twelveHoleRound);
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    for (let i = 0; i < 9; i++) {
+      await user.click(screen.getByRole("button", { name: /next hole/i }));
+    }
+    await screen.findByText("F9");
+
+    expect(screen.getByRole("button", { name: "Previous" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("Hole 10")).toBeInTheDocument();
   });
 
   it("shows an unrecorded score as a dash and reveals it after an adjustment", async () => {
