@@ -33,20 +33,27 @@ function mockNoContentFetchOnce() {
 }
 
 describe("rounds api", () => {
-  it("creates a round", async () => {
+  it("creates a round, sending the idempotency key as a header", async () => {
     const fetchMock = mockFetchOnce({
       id: 1,
       holes: [],
       players: [],
       scores: [],
     });
-    await createRound({ courseId: 1, layoutId: 2, playerIds: [3, 4] });
+    await createRound(
+      { courseId: 1, layoutId: 2, playerIds: [3, 4] },
+      "test-idempotency-key",
+    );
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/rounds",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ courseId: 1, layoutId: 2, playerIds: [3, 4] }),
       }),
+    );
+    const [, init] = fetchMock.mock.calls[0];
+    expect((init.headers as Headers).get("Idempotency-Key")).toBe(
+      "test-idempotency-key",
     );
   });
 

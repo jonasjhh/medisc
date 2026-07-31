@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
@@ -109,6 +109,22 @@ export function NewRoundPage() {
     selectedCourseId !== "" &&
     selectedLayoutId !== "";
 
+  // Stable for as long as the selections stay the same, so retrying a
+  // failed submit (e.g. after a network error, same click) reuses the same
+  // key and the server returns the round it already created rather than a
+  // duplicate. Changing the selection derives a new key, since that's a
+  // genuinely different round to create.
+  const selectedPlayerIdsKey = [...selectedPlayerIds]
+    .sort((a, b) => a - b)
+    .join(",");
+  // These deps only invalidate the cached key when the selection changes;
+  // the factory itself doesn't read them.
+  const idempotencyKey = useMemo(
+    () => crypto.randomUUID(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedCourseId, selectedLayoutId, selectedPlayerIdsKey],
+  );
+
   const handleStart = async () => {
     if (!canStart) {
       return;
@@ -116,11 +132,14 @@ export function NewRoundPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const round = await createRound({
-        courseId: selectedCourseId as number,
-        layoutId: selectedLayoutId as number,
-        playerIds: [...selectedPlayerIds],
-      });
+      const round = await createRound(
+        {
+          courseId: selectedCourseId as number,
+          layoutId: selectedLayoutId as number,
+          playerIds: [...selectedPlayerIds],
+        },
+        idempotencyKey,
+      );
       navigate(`/rounds/${round.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start round");

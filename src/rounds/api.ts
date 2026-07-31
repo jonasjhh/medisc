@@ -66,12 +66,11 @@ export function listRounds(
   return request(`/api/rounds${query ? `?${query}` : ""}`);
 }
 
-export function createRound(input: {
-  courseId: number;
-  layoutId: number;
-  playerIds: number[];
-}): Promise<RoundDetail> {
-  return postJson("/api/rounds", input);
+export function createRound(
+  input: { courseId: number; layoutId: number; playerIds: number[] },
+  idempotencyKey: string,
+): Promise<RoundDetail> {
+  return postJson("/api/rounds", input, { "Idempotency-Key": idempotencyKey });
 }
 
 export function getRound(roundId: number): Promise<RoundDetail> {

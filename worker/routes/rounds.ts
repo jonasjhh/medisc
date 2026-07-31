@@ -151,6 +151,21 @@ roundsRoute.post("/", async (c) => {
     return c.json({ error: parsed.error.flatten() }, 400);
   }
 
+  // If this exact request was already submitted (e.g. the client retried
+  // after the original response was lost), return the round that was
+  // already created instead of creating a duplicate.
+  const idempotencyKey = c.req.header("Idempotency-Key") ?? null;
+  if (idempotencyKey) {
+    const existing = await c.env.DB.prepare(
+      "SELECT id FROM rounds WHERE client_request_id = ?",
+    )
+      .bind(idempotencyKey)
+      .first<{ id: number }>();
+    if (existing) {
+      return c.json(await buildRoundDetail(c.env.DB, existing.id), 200);
+    }
+  }
+
   const { courseId, layoutId, playerIds } = parsed.data;
   const uniquePlayerIds = [...new Set(playerIds)];
 
@@ -176,12 +191,29 @@ roundsRoute.post("/", async (c) => {
     .bind(layoutId)
     .all<{ id: number; par: number }>();
 
-  const round = await c.env.DB.prepare(
-    "INSERT INTO rounds (course_id, layout_id) VALUES (?, ?) RETURNING id",
-  )
-    .bind(courseId, layoutId)
-    .first<{ id: number }>();
-  const roundId = round!.id;
+  let roundId: number;
+  try {
+    const round = await c.env.DB.prepare(
+      "INSERT INTO rounds (course_id, layout_id, client_request_id) VALUES (?, ?, ?) RETURNING id",
+    )
+      .bind(courseId, layoutId, idempotencyKey)
+      .first<{ id: number }>();
+    roundId = round!.id;
+  } catch (cause) {
+    // A concurrent retry with the same key can win the INSERT race; fall
+    // back to the round it created instead of surfacing a raw 500.
+    if (idempotencyKey) {
+      const existing = await c.env.DB.prepare(
+        "SELECT id FROM rounds WHERE client_request_id = ?",
+      )
+        .bind(idempotencyKey)
+        .first<{ id: number }>();
+      if (existing) {
+        return c.json(await buildRoundDetail(c.env.DB, existing.id), 200);
+      }
+    }
+    throw cause;
+  }
 
   const statements = [
     ...uniquePlayerIds.map((playerId) =>

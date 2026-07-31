@@ -22,10 +22,14 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json();
 }
 
-export function postJson<T>(path: string, body: unknown): Promise<T> {
+export function postJson<T>(
+  path: string,
+  body: unknown,
+  extraHeaders?: Record<string, string>,
+): Promise<T> {
   return request<T>(path, {
     method: "POST",
-    headers: jsonHeaders,
+    headers: { ...jsonHeaders, ...extraHeaders },
     body: JSON.stringify(body),
   });
 }

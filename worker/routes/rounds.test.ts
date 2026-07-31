@@ -92,6 +92,67 @@ describe("rounds API", () => {
     });
   });
 
+  it("returns the same round when POST is retried with the same Idempotency-Key", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const body = JSON.stringify({ courseId, layoutId, playerIds: [alice.id] });
+    const headers = {
+      "content-type": "application/json",
+      "Idempotency-Key": "retry-key-1",
+    };
+
+    const first = await request("/api/rounds", {
+      method: "POST",
+      headers,
+      body,
+    });
+    expect(first.status).toBe(201);
+    const firstRound = await json<{ id: number; scores: unknown[] }>(first);
+
+    const retry = await request("/api/rounds", {
+      method: "POST",
+      headers,
+      body,
+    });
+    expect(retry.status).toBe(200);
+    const retryRound = await json<{ id: number; scores: unknown[] }>(retry);
+    expect(retryRound.id).toBe(firstRound.id);
+
+    const { results: rounds } = await env.DB.prepare(
+      "SELECT id FROM rounds",
+    ).all();
+    expect(rounds).toHaveLength(1);
+  });
+
+  it("creates separate rounds for different Idempotency-Key values", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const body = JSON.stringify({ courseId, layoutId, playerIds: [alice.id] });
+
+    const first = await request("/api/rounds", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "Idempotency-Key": "key-a",
+      },
+      body,
+    });
+    const second = await request("/api/rounds", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "Idempotency-Key": "key-b",
+      },
+      body,
+    });
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+
+    const firstRound = await json<{ id: number }>(first);
+    const secondRound = await json<{ id: number }>(second);
+    expect(firstRound.id).not.toBe(secondRound.id);
+  });
+
   it("404s when the layout doesn't belong to the course", async () => {
     const { layoutId } = await setUpCourseWithTwoHoles();
     const { courseId: otherCourseId } = await seedCourse(env, {

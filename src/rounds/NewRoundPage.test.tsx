@@ -102,13 +102,55 @@ describe("NewRoundPage", () => {
     await user.click(screen.getByRole("button", { name: /start round/i }));
 
     await waitFor(() => {
-      expect(roundsApi.createRound).toHaveBeenCalledWith({
-        courseId: 1,
-        layoutId: 10,
-        playerIds: [1],
-      });
+      expect(roundsApi.createRound).toHaveBeenCalledWith(
+        {
+          courseId: 1,
+          layoutId: 10,
+          playerIds: [1],
+        },
+        expect.any(String),
+      );
     });
     expect(await screen.findByText("Round page")).toBeInTheDocument();
+  });
+
+  it("retries with the same idempotency key when the selections haven't changed", async () => {
+    const createRoundMock = vi.mocked(roundsApi.createRound);
+    const callsBefore = createRoundMock.mock.calls.length;
+    createRoundMock
+      .mockRejectedValueOnce(new Error("network error"))
+      .mockResolvedValueOnce({
+        id: 5,
+        createdAt: "",
+        completedAt: null,
+        counting: true,
+        course: { id: 1, name: "Maple Hill" },
+        layout: { id: 10, name: "Blue" },
+        holes: [],
+        players: [],
+        scores: [],
+      });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByLabelText("Alice"));
+    await user.click(await screen.findByLabelText("Course"));
+    await user.click(await screen.findByRole("option", { name: "Maple Hill" }));
+    await user.click(await screen.findByLabelText("Layout"));
+    await user.click(await screen.findByRole("option", { name: "Blue" }));
+
+    await user.click(screen.getByRole("button", { name: /start round/i }));
+    await waitFor(() => {
+      expect(createRoundMock.mock.calls.length).toBe(callsBefore + 1);
+    });
+    await user.click(screen.getByRole("button", { name: /start round/i }));
+    await waitFor(() => {
+      expect(createRoundMock.mock.calls.length).toBe(callsBefore + 2);
+    });
+
+    const [, firstKey] = createRoundMock.mock.calls[callsBefore];
+    const [, secondKey] = createRoundMock.mock.calls[callsBefore + 1];
+    expect(secondKey).toBe(firstKey);
   });
 
   it("disables Start round until a player and layout are selected", async () => {
