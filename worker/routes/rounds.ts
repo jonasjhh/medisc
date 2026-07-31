@@ -39,6 +39,7 @@ interface HoleScoreRow {
   player_id: number;
   strokes: number;
   penalties: number;
+  recorded: number;
 }
 
 async function buildRoundDetail(db: D1Database, roundId: number) {
@@ -82,7 +83,7 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
       .all<PlayerRow>(),
     db
       .prepare(
-        "SELECT id, hole_id, player_id, strokes, penalties FROM hole_scores WHERE round_id = ?",
+        "SELECT id, hole_id, player_id, strokes, penalties, recorded FROM hole_scores WHERE round_id = ?",
       )
       .bind(roundId)
       .all<HoleScoreRow>(),
@@ -108,6 +109,7 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
       playerId: score.player_id,
       strokes: score.strokes,
       penalties: score.penalties,
+      recorded: Boolean(score.recorded),
     })),
   };
 }
@@ -168,8 +170,8 @@ roundsRoute.post("/", async (c) => {
     ...uniquePlayerIds.flatMap((playerId) =>
       holes.map((hole) =>
         c.env.DB.prepare(
-          `INSERT INTO hole_scores (round_id, player_id, hole_id, strokes, penalties)
-           VALUES (?, ?, ?, ?, 0)`,
+          `INSERT INTO hole_scores (round_id, player_id, hole_id, strokes, penalties, recorded)
+           VALUES (?, ?, ?, ?, 0, 0)`,
         ).bind(roundId, playerId, hole.id, hole.par),
       ),
     ),
@@ -329,8 +331,8 @@ roundsRoute.patch("/:roundId", async (c) => {
       ...toAdd.flatMap((playerId) =>
         holes.map((hole) =>
           c.env.DB.prepare(
-            `INSERT INTO hole_scores (round_id, player_id, hole_id, strokes, penalties)
-             VALUES (?, ?, ?, ?, 0)`,
+            `INSERT INTO hole_scores (round_id, player_id, hole_id, strokes, penalties, recorded)
+             VALUES (?, ?, ?, ?, 0, 0)`,
           ).bind(roundId, playerId, hole.id, hole.par),
         ),
       ),

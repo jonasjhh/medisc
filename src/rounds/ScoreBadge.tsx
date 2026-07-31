@@ -18,7 +18,15 @@ const badgeTextColor: Record<
   dark: { birdie: "#0b2016", bogey: "#1a1a1a" },
 };
 
-export function ScoreBadge({ strokes, par }: { strokes: number; par: number }) {
+export function ScoreBadge({
+  strokes,
+  par,
+  recorded = true,
+}: {
+  strokes: number;
+  par: number;
+  recorded?: boolean;
+}) {
   const theme = useTheme();
   const outcome = scoreOutcome(strokes, par);
   const mode = theme.palette.mode;
@@ -50,7 +58,7 @@ export function ScoreBadge({ strokes, par }: { strokes: number; par: number }) {
         lineHeight: 1,
       }}
     >
-      {strokes}
+      {recorded ? strokes : "-"}
     </Box>
   );
 }

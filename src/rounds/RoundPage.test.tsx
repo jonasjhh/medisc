@@ -22,9 +22,47 @@ const baseRound: roundsApi.RoundDetail = {
   ],
   players: [{ id: 1, name: "Alice" }],
   scores: [
-    { id: 1000, holeId: 100, playerId: 1, strokes: 3, penalties: 0 },
-    { id: 1001, holeId: 101, playerId: 1, strokes: 4, penalties: 0 },
+    {
+      id: 1000,
+      holeId: 100,
+      playerId: 1,
+      strokes: 3,
+      penalties: 0,
+      recorded: true,
+    },
+    {
+      id: 1001,
+      holeId: 101,
+      playerId: 1,
+      strokes: 4,
+      penalties: 0,
+      recorded: true,
+    },
   ],
+};
+
+const twelveHoleRound: roundsApi.RoundDetail = {
+  id: 2,
+  createdAt: "",
+  completedAt: null,
+  counting: true,
+  course: { id: 2, name: "Stjørdal" },
+  layout: { id: 20, name: "12 Hull" },
+  holes: Array.from({ length: 12 }, (_, i) => ({
+    id: 300 + i,
+    number: i + 1,
+    par: 3,
+    distanceMeters: 80 + i,
+  })),
+  players: [{ id: 1, name: "Alice" }],
+  scores: Array.from({ length: 12 }, (_, i) => ({
+    id: 3000 + i,
+    holeId: 300 + i,
+    playerId: 1,
+    strokes: 3,
+    penalties: 0,
+    recorded: false,
+  })),
 };
 
 function renderPage() {
@@ -107,6 +145,7 @@ describe("RoundPage", () => {
       playerId: 1,
       strokes: 4,
       penalties: 0,
+      recorded: true,
     });
     const user = userEvent.setup();
     renderPage();
@@ -124,7 +163,14 @@ describe("RoundPage", () => {
     const roundAtMin: roundsApi.RoundDetail = {
       ...baseRound,
       scores: [
-        { id: 1000, holeId: 100, playerId: 1, strokes: 1, penalties: 0 },
+        {
+          id: 1000,
+          holeId: 100,
+          playerId: 1,
+          strokes: 1,
+          penalties: 0,
+          recorded: true,
+        },
         baseRound.scores[1],
       ],
     };
@@ -197,8 +243,22 @@ describe("RoundPage", () => {
       ...baseRound,
       players: [{ id: 2, name: "Bob" }],
       scores: [
-        { id: 2000, holeId: 100, playerId: 2, strokes: 3, penalties: 0 },
-        { id: 2001, holeId: 101, playerId: 2, strokes: 4, penalties: 0 },
+        {
+          id: 2000,
+          holeId: 100,
+          playerId: 2,
+          strokes: 3,
+          penalties: 0,
+          recorded: true,
+        },
+        {
+          id: 2001,
+          holeId: 101,
+          playerId: 2,
+          strokes: 4,
+          penalties: 0,
+          recorded: true,
+        },
       ],
     });
     const user = userEvent.setup();
@@ -258,6 +318,7 @@ describe("RoundPage", () => {
       playerId: 1,
       strokes: 3,
       penalties: 0,
+      recorded: true,
     });
     const user = userEvent.setup();
     renderPage();
@@ -289,8 +350,22 @@ describe("RoundPage", () => {
       ...baseRound,
       players: [{ id: 2, name: "Bob" }],
       scores: [
-        { id: 2000, holeId: 100, playerId: 2, strokes: 3, penalties: 0 },
-        { id: 2001, holeId: 101, playerId: 2, strokes: 4, penalties: 0 },
+        {
+          id: 2000,
+          holeId: 100,
+          playerId: 2,
+          strokes: 3,
+          penalties: 0,
+          recorded: true,
+        },
+        {
+          id: 2001,
+          holeId: 101,
+          playerId: 2,
+          strokes: 4,
+          penalties: 0,
+          recorded: true,
+        },
       ],
     });
     const user = userEvent.setup();
@@ -368,5 +443,62 @@ describe("RoundPage", () => {
     await user.click(screen.getByRole("button", { name: /previous hole/i }));
 
     expect(await screen.findByText("Hole 2")).toBeInTheDocument();
+  });
+
+  it("shows a Turn checkpoint after the front 9 with cumulative totals", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue(twelveHoleRound);
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    for (let i = 0; i < 9; i++) {
+      await user.click(screen.getByRole("button", { name: /next hole/i }));
+    }
+
+    expect(await screen.findByText("Turn")).toBeInTheDocument();
+    expect(screen.getByText("Par 27 through hole 9")).toBeInTheDocument();
+    expect(screen.getByText("Alice: 27 (E)")).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: /holes 1–9/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("table", { name: /holes 10–12/i }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /next hole/i }));
+    expect(await screen.findByText("Hole 10")).toBeInTheDocument();
+  });
+
+  it("shows bottom Previous/Next buttons only on hole steps", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("Hole 2")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /next hole/i }));
+    await screen.findByText("Summary");
+    expect(
+      screen.queryByRole("button", { name: "Previous" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Next" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows an unrecorded score as a dash and reveals it after an adjustment", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue(twelveHoleRound);
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    expect(screen.getByText("-")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /increase strokes/i }));
+
+    expect(await screen.findByText("4")).toBeInTheDocument();
+    expect(screen.queryByText("-")).not.toBeInTheDocument();
   });
 });

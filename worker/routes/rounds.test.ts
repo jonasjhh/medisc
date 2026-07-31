@@ -70,6 +70,7 @@ describe("rounds API", () => {
         playerId: number;
         strokes: number;
         penalties: number;
+        recorded: boolean;
       }>;
     }>(res);
 
@@ -84,7 +85,11 @@ describe("rounds API", () => {
     const aliceHole1 = round.scores.find(
       (s) => s.holeId === hole1.id && s.playerId === alice.id,
     )!;
-    expect(aliceHole1).toMatchObject({ strokes: 3, penalties: 0 });
+    expect(aliceHole1).toMatchObject({
+      strokes: 3,
+      penalties: 0,
+      recorded: false,
+    });
   });
 
   it("404s when the layout doesn't belong to the course", async () => {
@@ -335,13 +340,16 @@ describe("rounds API", () => {
     expect(res.status).toBe(200);
     const updated = await json<{
       players: Array<{ id: number; name: string }>;
-      scores: Array<{ playerId: number }>;
+      scores: Array<{ playerId: number; recorded: boolean }>;
     }>(res);
     expect(updated.players).toEqual([{ id: bob.id, name: "Bob" }]);
     expect(updated.scores.every((score) => score.playerId === bob.id)).toBe(
       true,
     );
     expect(updated.scores).toHaveLength(2); // 2 holes x 1 player
+    expect(updated.scores.every((score) => score.recorded === false)).toBe(
+      true,
+    );
   });
 
   it("409s when swapping players on a completed round", async () => {

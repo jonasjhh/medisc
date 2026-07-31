@@ -19,6 +19,7 @@ export function ScoreAdjuster({
   onIncrement,
   readOnly = false,
   outcome,
+  recorded = true,
 }: {
   label: string;
   value: number;
@@ -27,6 +28,7 @@ export function ScoreAdjuster({
   onIncrement: () => void;
   readOnly?: boolean;
   outcome?: ScoreOutcome;
+  recorded?: boolean;
 }) {
   return (
     <Box textAlign="center">
@@ -50,7 +52,7 @@ export function ScoreAdjuster({
           color={outcome ? outcomeColor[outcome] : undefined}
           fontWeight={outcome && outcome !== "par" ? 700 : undefined}
         >
-          {value}
+          {recorded ? value : "-"}
         </Typography>
         {!readOnly && (
           <IconButton

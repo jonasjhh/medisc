@@ -37,7 +37,7 @@ import {
   updateHoleScore,
   updateRound,
 } from "./api";
-import type { RoundDetail, RoundPlayer } from "./api";
+import type { RoundDetail, RoundHole, RoundPlayer, RoundScore } from "./api";
 import { ScoreAdjuster } from "./ScoreAdjuster";
 import { ScoreBadge } from "./ScoreBadge";
 import { scoreOutcome } from "./scoreColor";
@@ -58,6 +58,109 @@ function relativeToPar(total: number, par: number): string {
   return diff > 0 ? `+${diff}` : `${diff}`;
 }
 
+type Step =
+  | { kind: "hole"; hole: RoundHole }
+  | { kind: "checkpoint"; groupIndex: number }
+  | { kind: "final" };
+
+function TotalsList({
+  players,
+  scores,
+  holesInScope,
+}: {
+  players: RoundPlayer[];
+  scores: RoundScore[];
+  holesInScope: RoundHole[];
+}) {
+  const holeIds = new Set(holesInScope.map((hole) => hole.id));
+  const par = holesInScope.reduce((sum, hole) => sum + hole.par, 0);
+  return (
+    <Stack spacing={0.5}>
+      {players.map((player) => {
+        const total = scores
+          .filter(
+            (score) =>
+              score.playerId === player.id && holeIds.has(score.holeId),
+          )
+          .reduce((sum, score) => sum + score.strokes, 0);
+        return (
+          <Typography key={player.id} fontWeight={600}>
+            {player.name}: {total} ({relativeToPar(total, par)})
+          </Typography>
+        );
+      })}
+    </Stack>
+  );
+}
+
+function ScorecardGroupTable({
+  holes,
+  players,
+  scoreByKey,
+}: {
+  holes: RoundHole[];
+  players: RoundPlayer[];
+  scoreByKey: Map<string, RoundScore>;
+}) {
+  return (
+    <Box sx={{ overflowX: "auto" }}>
+      <Table
+        size="small"
+        aria-label={`Scorecard summary, holes ${holes[0].number}–${holes[holes.length - 1].number}`}
+        sx={{
+          "& td, & th": { px: 0.75, py: 0.5, fontSize: "0.8125rem" },
+        }}
+      >
+        <TableHead>
+          <TableRow>
+            <TableCell>Hole</TableCell>
+            {holes.map((roundHole) => (
+              <TableCell key={roundHole.id} align="center">
+                {roundHole.number}
+              </TableCell>
+            ))}
+          </TableRow>
+          <TableRow>
+            <TableCell sx={{ color: "text.secondary" }}>Par</TableCell>
+            {holes.map((roundHole) => (
+              <TableCell
+                key={roundHole.id}
+                align="center"
+                sx={{ color: "text.secondary" }}
+              >
+                {roundHole.par}
+              </TableCell>
+            ))}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {players.map((player) => (
+            <TableRow key={player.id}>
+              <TableCell component="th" scope="row">
+                {player.name}
+              </TableCell>
+              {holes.map((roundHole) => {
+                const score = scoreByKey.get(`${roundHole.id}:${player.id}`);
+                return (
+                  <TableCell key={roundHole.id} align="center">
+                    {score && (
+                      <ScoreBadge
+                        strokes={score.strokes}
+                        par={roundHole.par}
+                        recorded={score.recorded}
+                      />
+                    )}
+                  </TableCell>
+                );
+              })}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Box>
+  );
+}
+
 type Status = "loading" | "ready" | "error";
 type Field = "strokes" | "penalties";
 
@@ -68,7 +171,7 @@ export function RoundPage() {
   const [round, setRound] = useState<RoundDetail | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
-  const [holeIndex, setHoleIndex] = useState(0);
+  const [stepIndex, setStepIndex] = useState(0);
   const [finishing, setFinishing] = useState(false);
   const [reopening, setReopening] = useState(false);
   const [togglingCounting, setTogglingCounting] = useState(false);
@@ -120,7 +223,9 @@ export function RoundPage() {
     setRound({
       ...round,
       scores: round.scores.map((score) =>
-        score.id === scoreId ? { ...score, [field]: nextValue } : score,
+        score.id === scoreId
+          ? { ...score, [field]: nextValue, recorded: true }
+          : score,
       ),
     });
 
@@ -264,18 +369,26 @@ export function RoundPage() {
     );
   }
 
-  const isSummary = holeIndex === round.holes.length;
-  const hole = round.holes[isSummary ? 0 : holeIndex];
-  const isFirstHole = holeIndex === 0;
-  const isLastHole = isSummary;
   const isCompleted = round.completedAt !== null;
-  const birdieValue = Math.max(1, hole.par - 1);
-  const bogeyValue = hole.par + 1;
   const coursePar = round.holes.reduce((sum, h) => sum + h.par, 0);
   const holeGroups = chunk(round.holes, HOLES_PER_GROUP);
   const scoreByKey = new Map(
     round.scores.map((score) => [`${score.holeId}:${score.playerId}`, score]),
   );
+
+  const steps: Step[] = holeGroups.flatMap((holes, groupIndex) => [
+    ...holes.map((h) => ({ kind: "hole" as const, hole: h })),
+    groupIndex === holeGroups.length - 1
+      ? { kind: "final" as const }
+      : { kind: "checkpoint" as const, groupIndex },
+  ]);
+  const step = steps[stepIndex];
+  const isFirstStep = stepIndex === 0;
+  const isLastStep = stepIndex === steps.length - 1;
+  const hole = step.kind === "hole" ? step.hole : round.holes[0];
+  const birdieValue = Math.max(1, hole.par - 1);
+  const bogeyValue = hole.par + 1;
+
   const playersNotInRound = allPlayers.filter(
     (player) =>
       !round.players.some((roundPlayer) => roundPlayer.id === player.id),
@@ -447,18 +560,32 @@ export function RoundPage() {
       >
         <IconButton
           aria-label="previous hole"
-          onClick={() => setHoleIndex((index) => Math.max(0, index - 1))}
-          disabled={isFirstHole}
+          onClick={() => setStepIndex((index) => Math.max(0, index - 1))}
+          disabled={isFirstStep}
         >
           <ArrowBackIcon />
         </IconButton>
-        {isSummary ? (
+        {step.kind === "final" ? (
           <Box textAlign="center">
             <Typography variant="h4">Summary</Typography>
             <Typography color="text.secondary">
               Course par {coursePar}
             </Typography>
           </Box>
+        ) : step.kind === "checkpoint" ? (
+          (() => {
+            const holesSoFar = holeGroups.slice(0, step.groupIndex + 1).flat();
+            const parSoFar = holesSoFar.reduce((sum, h) => sum + h.par, 0);
+            const lastHole = holesSoFar[holesSoFar.length - 1];
+            return (
+              <Box textAlign="center">
+                <Typography variant="h4">Turn</Typography>
+                <Typography color="text.secondary">
+                  Par {parSoFar} through hole {lastHole.number}
+                </Typography>
+              </Box>
+            );
+          })()
         ) : (
           <Box textAlign="center">
             <Typography variant="h4">Hole {hole.number}</Typography>
@@ -471,86 +598,44 @@ export function RoundPage() {
         <IconButton
           aria-label="next hole"
           onClick={() =>
-            setHoleIndex((index) => Math.min(round.holes.length, index + 1))
+            setStepIndex((index) => Math.min(steps.length - 1, index + 1))
           }
-          disabled={isLastHole}
+          disabled={isLastStep}
         >
           <ArrowForwardIcon />
         </IconButton>
       </Stack>
 
-      {isSummary ? (
+      {step.kind === "checkpoint" ? (
         <Stack spacing={2}>
-          <Stack direction="row" flexWrap="wrap" columnGap={2} rowGap={0.5}>
-            {round.players.map((player) => {
-              const total = round.scores
-                .filter((score) => score.playerId === player.id)
-                .reduce((sum, score) => sum + score.strokes, 0);
-              return (
-                <Typography key={player.id} fontWeight={600}>
-                  {player.name}: {total} ({relativeToPar(total, coursePar)})
-                </Typography>
-              );
-            })}
-          </Stack>
-
+          <TotalsList
+            players={round.players}
+            scores={round.scores}
+            holesInScope={holeGroups.slice(0, step.groupIndex + 1).flat()}
+          />
+          {holeGroups.slice(0, step.groupIndex + 1).map((holes) => (
+            <ScorecardGroupTable
+              key={holes[0].id}
+              holes={holes}
+              players={round.players}
+              scoreByKey={scoreByKey}
+            />
+          ))}
+        </Stack>
+      ) : step.kind === "final" ? (
+        <Stack spacing={2}>
+          <TotalsList
+            players={round.players}
+            scores={round.scores}
+            holesInScope={round.holes}
+          />
           {holeGroups.map((holes) => (
-            <Box key={holes[0].id} sx={{ overflowX: "auto" }}>
-              <Table
-                size="small"
-                aria-label={`Scorecard summary, holes ${holes[0].number}–${holes[holes.length - 1].number}`}
-                sx={{
-                  "& td, & th": { px: 0.75, py: 0.5, fontSize: "0.8125rem" },
-                }}
-              >
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Hole</TableCell>
-                    {holes.map((roundHole) => (
-                      <TableCell key={roundHole.id} align="center">
-                        {roundHole.number}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                  <TableRow>
-                    <TableCell sx={{ color: "text.secondary" }}>Par</TableCell>
-                    {holes.map((roundHole) => (
-                      <TableCell
-                        key={roundHole.id}
-                        align="center"
-                        sx={{ color: "text.secondary" }}
-                      >
-                        {roundHole.par}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {round.players.map((player) => (
-                    <TableRow key={player.id}>
-                      <TableCell component="th" scope="row">
-                        {player.name}
-                      </TableCell>
-                      {holes.map((roundHole) => {
-                        const score = scoreByKey.get(
-                          `${roundHole.id}:${player.id}`,
-                        );
-                        return (
-                          <TableCell key={roundHole.id} align="center">
-                            {score && (
-                              <ScoreBadge
-                                strokes={score.strokes}
-                                par={roundHole.par}
-                              />
-                            )}
-                          </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Box>
+            <ScorecardGroupTable
+              key={holes[0].id}
+              holes={holes}
+              players={round.players}
+              scoreByKey={scoreByKey}
+            />
           ))}
         </Stack>
       ) : (
@@ -613,6 +698,7 @@ export function RoundPage() {
                     min={1}
                     readOnly={isCompleted}
                     outcome={outcome}
+                    recorded={score.recorded}
                     onDecrement={() => void adjust(score.id, "strokes", -1)}
                     onIncrement={() => void adjust(score.id, "strokes", 1)}
                   />
@@ -628,6 +714,25 @@ export function RoundPage() {
               </Paper>
             );
           })}
+
+          <Stack direction="row" justifyContent="space-between" spacing={2}>
+            <Button
+              startIcon={<ArrowBackIcon />}
+              onClick={() => setStepIndex((index) => Math.max(0, index - 1))}
+              disabled={isFirstStep}
+            >
+              Previous
+            </Button>
+            <Button
+              endIcon={<ArrowForwardIcon />}
+              onClick={() =>
+                setStepIndex((index) => Math.min(steps.length - 1, index + 1))
+              }
+              disabled={isLastStep}
+            >
+              Next
+            </Button>
+          </Stack>
         </Stack>
       )}
 

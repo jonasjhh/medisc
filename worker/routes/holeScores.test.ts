@@ -26,7 +26,12 @@ async function setUpRoundWithOneScore() {
   );
   const round = await json<{
     id: number;
-    scores: Array<{ id: number; strokes: number; penalties: number }>;
+    scores: Array<{
+      id: number;
+      strokes: number;
+      penalties: number;
+      recorded: boolean;
+    }>;
   }>(
     await request("/api/rounds", {
       method: "POST",
@@ -54,7 +59,11 @@ describe("hole-scores API", () => {
 
   it("updates strokes only", async () => {
     const { score } = await setUpRoundWithOneScore();
-    expect(score).toMatchObject({ strokes: 3, penalties: 0 });
+    expect(score).toMatchObject({
+      strokes: 3,
+      penalties: 0,
+      recorded: false,
+    });
 
     const res = await request(`/api/hole-scores/${score.id}`, {
       method: "PATCH",
@@ -62,8 +71,12 @@ describe("hole-scores API", () => {
       body: JSON.stringify({ strokes: 4 }),
     });
     expect(res.status).toBe(200);
-    const updated = await json<{ strokes: number; penalties: number }>(res);
-    expect(updated).toMatchObject({ strokes: 4, penalties: 0 });
+    const updated = await json<{
+      strokes: number;
+      penalties: number;
+      recorded: boolean;
+    }>(res);
+    expect(updated).toMatchObject({ strokes: 4, penalties: 0, recorded: true });
   });
 
   it("updates penalties only, leaving strokes untouched", async () => {
@@ -74,8 +87,12 @@ describe("hole-scores API", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ penalties: 2 }),
     });
-    const updated = await json<{ strokes: number; penalties: number }>(res);
-    expect(updated).toMatchObject({ strokes: 3, penalties: 2 });
+    const updated = await json<{
+      strokes: number;
+      penalties: number;
+      recorded: boolean;
+    }>(res);
+    expect(updated).toMatchObject({ strokes: 3, penalties: 2, recorded: true });
   });
 
   it("404s for a hole score that doesn't exist", async () => {

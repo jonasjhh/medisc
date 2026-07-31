@@ -20,4 +20,10 @@ describe("ScoreBadge", () => {
 
     expect(screen.getByTestId("score-badge")).toHaveTextContent("4");
   });
+
+  it("shows a dash when the score hasn't been recorded yet", () => {
+    render(<ScoreBadge strokes={3} par={3} recorded={false} />);
+
+    expect(screen.getByTestId("score-badge")).toHaveTextContent("-");
+  });
 });

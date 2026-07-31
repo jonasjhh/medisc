@@ -9,6 +9,7 @@ interface HoleScoreRow {
   player_id: number;
   strokes: number;
   penalties: number;
+  recorded: number;
 }
 
 export const holeScoresRoute = new Hono<AppEnv>();
@@ -50,9 +51,9 @@ holeScoresRoute.patch("/:id", async (c) => {
   const penalties = parsed.data.penalties ?? existing.penalties;
 
   const row = await c.env.DB.prepare(
-    `UPDATE hole_scores SET strokes = ?, penalties = ?
+    `UPDATE hole_scores SET strokes = ?, penalties = ?, recorded = 1
      WHERE id = ?
-     RETURNING id, round_id, hole_id, player_id, strokes, penalties`,
+     RETURNING id, round_id, hole_id, player_id, strokes, penalties, recorded`,
   )
     .bind(strokes, penalties, id)
     .first<HoleScoreRow>();
@@ -64,5 +65,6 @@ holeScoresRoute.patch("/:id", async (c) => {
     playerId: row!.player_id,
     strokes: row!.strokes,
     penalties: row!.penalties,
+    recorded: Boolean(row!.recorded),
   });
 });

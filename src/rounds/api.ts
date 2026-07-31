@@ -28,6 +28,7 @@ export interface RoundScore {
   playerId: number;
   strokes: number;
   penalties: number;
+  recorded: boolean;
 }
 
 export interface RoundDetail {
