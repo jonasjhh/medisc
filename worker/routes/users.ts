@@ -1,6 +1,12 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types";
 import { linkDeviceSchema } from "../schemas";
+import {
+  currentUserResponseSchema,
+  identityUserSchema,
+  linkCodeResponseSchema,
+  userResponseSchema,
+} from "../../shared/contracts/identity";
 
 interface UserRow {
   id: number;
@@ -41,13 +47,13 @@ async function loadUser(db: D1Database, userId: number) {
     .bind(userId)
     .first<ClaimedPlayerRow>();
 
-  return {
+  return identityUserSchema.parse({
     id: user.id,
     createdAt: user.created_at,
     claimedPlayer: claimedPlayer
       ? { id: claimedPlayer.id, name: claimedPlayer.name }
       : null,
-  };
+  });
 }
 
 export const usersRoute = new Hono<AppEnv>();
@@ -59,10 +65,10 @@ usersRoute.get("/me", async (c) => {
   }
   const userId = c.get("userId");
   if (userId === null) {
-    return c.json({ user: null });
+    return c.json(currentUserResponseSchema.parse({ user: null }));
   }
   const user = await loadUser(c.env.DB, userId);
-  return c.json({ user });
+  return c.json(currentUserResponseSchema.parse({ user }));
 });
 
 usersRoute.post("/", async (c) => {
@@ -74,7 +80,7 @@ usersRoute.post("/", async (c) => {
   const existingUserId = c.get("userId");
   if (existingUserId !== null) {
     const user = await loadUser(c.env.DB, existingUserId);
-    return c.json({ user }, 200);
+    return c.json(userResponseSchema.parse({ user }), 200);
   }
 
   const created = await c.env.DB.prepare(
@@ -88,13 +94,13 @@ usersRoute.post("/", async (c) => {
     .run();
 
   return c.json(
-    {
+    userResponseSchema.parse({
       user: {
         id: created!.id,
         createdAt: created!.created_at,
         claimedPlayer: null,
       },
-    },
+    }),
     201,
   );
 });
@@ -115,7 +121,13 @@ usersRoute.post("/me/link-code", async (c) => {
       )
         .bind(code, userId)
         .first<{ code: string; expires_at: string }>();
-      return c.json({ code: row!.code, expiresAt: row!.expires_at }, 201);
+      return c.json(
+        linkCodeResponseSchema.parse({
+          code: row!.code,
+          expiresAt: row!.expires_at,
+        }),
+        201,
+      );
     } catch {
       // UNIQUE collision on code — extremely unlikely at this volume; retry.
       continue;
@@ -174,7 +186,7 @@ usersRoute.post("/link", async (c) => {
     .run();
 
   const user = await loadUser(c.env.DB, linkCode.user_id);
-  return c.json({ user }, 200);
+  return c.json(userResponseSchema.parse({ user }), 200);
 });
 
 usersRoute.post("/me/unclaim", async (c) => {
@@ -193,5 +205,5 @@ usersRoute.post("/me/unclaim", async (c) => {
   }
 
   const user = await loadUser(c.env.DB, userId);
-  return c.json({ user });
+  return c.json(userResponseSchema.parse({ user }));
 });

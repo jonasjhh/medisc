@@ -1,16 +1,20 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { ZodTypeAny, z } from "zod";
 import app from "../index";
 import { seedUser } from "../test/seed";
+import {
+  currentUserResponseSchema,
+  linkCodeResponseSchema,
+  userResponseSchema,
+} from "../../shared/contracts/identity";
+import { playerSchema } from "../../shared/contracts/players";
 
-interface UserResponse {
-  id: number;
-  createdAt: string;
-  claimedPlayer: { id: number; name: string } | null;
-}
-
-async function json<T>(response: Response): Promise<T> {
-  return response.json() as Promise<T>;
+async function json<S extends ZodTypeAny>(
+  response: Response,
+  schema: S,
+): Promise<z.infer<S>> {
+  return schema.parse(await response.json());
 }
 
 async function request(path: string, init?: RequestInit): Promise<Response> {
@@ -39,7 +43,9 @@ describe("users API", () => {
         headers: { "X-Device-Token": "unknown-token" },
       });
       expect(res.status).toBe(200);
-      expect(await json<{ user: null }>(res)).toEqual({ user: null });
+      expect(await json(res, currentUserResponseSchema)).toEqual({
+        user: null,
+      });
     });
 
     it("resolves a known token to its user", async () => {
@@ -47,7 +53,7 @@ describe("users API", () => {
       const res = await request("/api/users/me", {
         headers: { "X-Device-Token": deviceToken },
       });
-      expect(await json<{ user: UserResponse }>(res)).toEqual({
+      expect(await json(res, currentUserResponseSchema)).toEqual({
         user: {
           id: userId,
           createdAt: expect.any(String),
@@ -69,13 +75,15 @@ describe("users API", () => {
         headers: { "X-Device-Token": "brand-new-token" },
       });
       expect(res.status).toBe(201);
-      const { user } = await json<{ user: UserResponse }>(res);
+      const { user } = await json(res, userResponseSchema);
       expect(user.claimedPlayer).toBeNull();
 
       const meRes = await request("/api/users/me", {
         headers: { "X-Device-Token": "brand-new-token" },
       });
-      expect((await json<{ user: UserResponse }>(meRes)).user.id).toBe(user.id);
+      expect((await json(meRes, currentUserResponseSchema)).user?.id).toBe(
+        user.id,
+      );
     });
 
     it("is idempotent for an already-mapped token", async () => {
@@ -85,7 +93,7 @@ describe("users API", () => {
         headers: { "X-Device-Token": deviceToken },
       });
       expect(res.status).toBe(200);
-      expect((await json<{ user: UserResponse }>(res)).user.id).toBe(userId);
+      expect((await json(res, userResponseSchema)).user.id).toBe(userId);
     });
   });
 
@@ -105,10 +113,7 @@ describe("users API", () => {
         headers: { "X-Device-Token": deviceToken },
       });
       expect(res.status).toBe(201);
-      const { code, expiresAt } = await json<{
-        code: string;
-        expiresAt: string;
-      }>(res);
+      const { code, expiresAt } = await json(res, linkCodeResponseSchema);
       expect(code).toMatch(/^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{8}$/);
       expect(expiresAt).toEqual(expect.any(String));
     });
@@ -204,12 +209,13 @@ describe("users API", () => {
     it("links a second device to the same user and it inherits the claimed player", async () => {
       const { userId, deviceToken: deviceA } = await seedUser(env);
 
-      const player = await json<{ id: number }>(
+      const player = await json(
         await request("/api/players", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ name: "Alice" }),
         }),
+        playerSchema,
       );
       await request(`/api/players/${player.id}/claim`, {
         method: "POST",
@@ -220,7 +226,7 @@ describe("users API", () => {
         method: "POST",
         headers: { "X-Device-Token": deviceA },
       });
-      const { code } = await json<{ code: string }>(codeRes);
+      const { code } = await json(codeRes, linkCodeResponseSchema);
 
       const linkRes = await request("/api/users/link", {
         method: "POST",
@@ -231,14 +237,16 @@ describe("users API", () => {
         body: JSON.stringify({ code }),
       });
       expect(linkRes.status).toBe(200);
-      const { user } = await json<{ user: UserResponse }>(linkRes);
+      const { user } = await json(linkRes, userResponseSchema);
       expect(user.id).toBe(userId);
       expect(user.claimedPlayer).toEqual({ id: player.id, name: "Alice" });
 
       const meRes = await request("/api/users/me", {
         headers: { "X-Device-Token": "device-b" },
       });
-      expect((await json<{ user: UserResponse }>(meRes)).user.id).toBe(userId);
+      expect((await json(meRes, currentUserResponseSchema)).user?.id).toBe(
+        userId,
+      );
     });
   });
 
@@ -260,12 +268,13 @@ describe("users API", () => {
     it("releases a claimed player, allowing a different user to claim it", async () => {
       const { deviceToken: deviceA } = await seedUser(env);
       const { deviceToken: deviceB } = await seedUser(env);
-      const player = await json<{ id: number }>(
+      const player = await json(
         await request("/api/players", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ name: "Alice" }),
         }),
+        playerSchema,
       );
       await request(`/api/players/${player.id}/claim`, {
         method: "POST",
@@ -278,7 +287,7 @@ describe("users API", () => {
       });
       expect(unclaimRes.status).toBe(200);
       expect(
-        (await json<{ user: UserResponse }>(unclaimRes)).user.claimedPlayer,
+        (await json(unclaimRes, userResponseSchema)).user.claimedPlayer,
       ).toBeNull();
 
       const claimRes = await request(`/api/players/${player.id}/claim`, {
