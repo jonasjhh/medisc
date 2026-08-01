@@ -2,6 +2,10 @@ import { Hono } from "hono";
 import type { AppEnv } from "../types";
 import { createRoundSchema, updateRoundSchema } from "../schemas";
 import { parseIntParam } from "../params";
+import {
+  roundDetailSchema,
+  roundListResponseSchema,
+} from "../../shared/contracts/rounds";
 
 interface RoundRow {
   id: number;
@@ -90,7 +94,7 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
       .all<HoleScoreRow>(),
   ]);
 
-  return {
+  return roundDetailSchema.parse({
     id: round.id,
     createdAt: round.created_at,
     completedAt: round.completed_at,
@@ -112,7 +116,7 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
       penalties: score.penalties,
       recorded: Boolean(score.recorded),
     })),
-  };
+  });
 }
 
 async function allPlayersExist(db: D1Database, playerIds: number[]) {
@@ -273,17 +277,19 @@ roundsRoute.get("/", async (c) => {
     .bind(...params)
     .all<RoundListRow>();
 
-  return c.json({
-    rounds: results.map((row) => ({
-      id: row.id,
-      createdAt: row.created_at,
-      completedAt: row.completed_at,
-      counting: Boolean(row.counting),
-      courseName: row.course_name,
-      layoutName: row.layout_name,
-      playerCount: row.player_count,
-    })),
-  });
+  return c.json(
+    roundListResponseSchema.parse({
+      rounds: results.map((row) => ({
+        id: row.id,
+        createdAt: row.created_at,
+        completedAt: row.completed_at,
+        counting: Boolean(row.counting),
+        courseName: row.course_name,
+        layoutName: row.layout_name,
+        playerCount: row.player_count,
+      })),
+    }),
+  );
 });
 
 roundsRoute.get("/:roundId", async (c) => {

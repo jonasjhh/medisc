@@ -9,6 +9,59 @@ import {
   updateHoleScore,
   updateRound,
 } from "./api";
+import {
+  holeScoreResponseSchema,
+  roundDetailSchema,
+  roundSummarySchema,
+} from "../../shared/contracts/rounds";
+import type {
+  HoleScoreResponse,
+  RoundDetail,
+  RoundSummary,
+} from "../../shared/contracts/rounds";
+
+function aRoundDetail(overrides: Partial<RoundDetail> = {}): RoundDetail {
+  return roundDetailSchema.parse({
+    id: 1,
+    createdAt: "2026-01-01",
+    completedAt: null,
+    counting: true,
+    course: { id: 1, name: "Maple Hill" },
+    layout: { id: 2, name: "Blue" },
+    holes: [],
+    players: [],
+    scores: [],
+    ...overrides,
+  });
+}
+
+function aRoundSummary(overrides: Partial<RoundSummary> = {}): RoundSummary {
+  return roundSummarySchema.parse({
+    id: 1,
+    createdAt: "2026-01-01",
+    completedAt: null,
+    counting: true,
+    courseName: "Maple Hill",
+    layoutName: "Blue",
+    playerCount: 1,
+    ...overrides,
+  });
+}
+
+function aHoleScoreResponse(
+  overrides: Partial<HoleScoreResponse> = {},
+): HoleScoreResponse {
+  return holeScoreResponseSchema.parse({
+    id: 10,
+    roundId: 1,
+    holeId: 100,
+    playerId: 1,
+    strokes: 4,
+    penalties: 0,
+    recorded: true,
+    ...overrides,
+  });
+}
 
 function mockFetchOnce(body: unknown, init: { ok?: boolean } = {}) {
   const fetchMock = vi.fn().mockResolvedValue({
@@ -34,12 +87,7 @@ function mockNoContentFetchOnce() {
 
 describe("rounds api", () => {
   it("creates a round, sending the idempotency key as a header", async () => {
-    const fetchMock = mockFetchOnce({
-      id: 1,
-      holes: [],
-      players: [],
-      scores: [],
-    });
+    const fetchMock = mockFetchOnce(aRoundDetail());
     await createRound(
       { courseId: 1, layoutId: 2, playerIds: [3, 4] },
       "test-idempotency-key",
@@ -59,10 +107,12 @@ describe("rounds api", () => {
 
   it("lists rounds with no filters", async () => {
     const fetchMock = mockFetchOnce({
-      rounds: [{ id: 1, courseName: "Maple Hill" }],
+      rounds: [aRoundSummary({ id: 1, courseName: "Maple Hill" })],
     });
     const { rounds } = await listRounds();
-    expect(rounds).toEqual([{ id: 1, courseName: "Maple Hill" }]);
+    expect(rounds).toEqual([
+      aRoundSummary({ id: 1, courseName: "Maple Hill" }),
+    ]);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/rounds",
       expect.objectContaining({ headers: expect.any(Headers) }),
@@ -79,12 +129,7 @@ describe("rounds api", () => {
   });
 
   it("gets a round's detail", async () => {
-    const fetchMock = mockFetchOnce({
-      id: 1,
-      holes: [],
-      players: [],
-      scores: [],
-    });
+    const fetchMock = mockFetchOnce(aRoundDetail());
     await getRound(1);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/rounds/1",
@@ -93,7 +138,9 @@ describe("rounds api", () => {
   });
 
   it("updates a hole score", async () => {
-    const fetchMock = mockFetchOnce({ id: 10, strokes: 4, penalties: 0 });
+    const fetchMock = mockFetchOnce(
+      aHoleScoreResponse({ id: 10, strokes: 4, penalties: 0 }),
+    );
     await updateHoleScore(10, { strokes: 4 });
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/hole-scores/10",
@@ -105,7 +152,9 @@ describe("rounds api", () => {
   });
 
   it("completes a round", async () => {
-    const fetchMock = mockFetchOnce({ id: 1, completedAt: "2026-01-01" });
+    const fetchMock = mockFetchOnce(
+      aRoundDetail({ id: 1, completedAt: "2026-01-01" }),
+    );
     await completeRound(1);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/rounds/1/complete",
@@ -114,7 +163,7 @@ describe("rounds api", () => {
   });
 
   it("reopens a round", async () => {
-    const fetchMock = mockFetchOnce({ id: 1, completedAt: null });
+    const fetchMock = mockFetchOnce(aRoundDetail({ id: 1, completedAt: null }));
     await reopenRound(1);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/rounds/1/reopen",
@@ -123,12 +172,7 @@ describe("rounds api", () => {
   });
 
   it("updates a round's players and counting flag", async () => {
-    const fetchMock = mockFetchOnce({
-      id: 1,
-      holes: [],
-      players: [],
-      scores: [],
-    });
+    const fetchMock = mockFetchOnce(aRoundDetail());
     await updateRound(1, { playerIds: [2, 3], counting: false });
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/rounds/1",

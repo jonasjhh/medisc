@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../types";
 import { updateHoleScoreSchema } from "../schemas";
 import { parseIntParam } from "../params";
+import { holeScoreResponseSchema } from "../../shared/contracts/rounds";
 
 interface HoleScoreRow {
   id: number;
@@ -58,13 +59,15 @@ holeScoresRoute.patch("/:id", async (c) => {
     .bind(strokes, penalties, id)
     .first<HoleScoreRow>();
 
-  return c.json({
-    id: row!.id,
-    roundId: row!.round_id,
-    holeId: row!.hole_id,
-    playerId: row!.player_id,
-    strokes: row!.strokes,
-    penalties: row!.penalties,
-    recorded: Boolean(row!.recorded),
-  });
+  return c.json(
+    holeScoreResponseSchema.parse({
+      id: row!.id,
+      roundId: row!.round_id,
+      holeId: row!.hole_id,
+      playerId: row!.player_id,
+      strokes: row!.strokes,
+      penalties: row!.penalties,
+      recorded: Boolean(row!.recorded),
+    }),
+  );
 });

@@ -50,6 +50,7 @@ describe("useRoundData", () => {
   it("saves a score optimistically and clears any prior error", async () => {
     vi.mocked(roundsApi.updateHoleScore).mockResolvedValue({
       ...baseRound.scores[0],
+      roundId: baseRound.id,
       strokes: 4,
     });
     const { result } = renderHook(() => useRoundData(1));
@@ -86,6 +87,7 @@ describe("useRoundData", () => {
   it("adjust() never lets strokes drop below 1", async () => {
     vi.mocked(roundsApi.updateHoleScore).mockResolvedValue({
       ...baseRound.scores[0],
+      roundId: baseRound.id,
       strokes: 1,
     });
     const { result } = renderHook(() => useRoundData(1));

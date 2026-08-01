@@ -1,10 +1,18 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { ZodTypeAny, z } from "zod";
 import app from "../index";
 import { seedCourse } from "../test/seed";
+import {
+  holeScoreResponseSchema,
+  roundDetailSchema,
+} from "../../shared/contracts/rounds";
 
-async function json<T>(response: Response): Promise<T> {
-  return response.json() as Promise<T>;
+async function json<S extends ZodTypeAny>(
+  response: Response,
+  schema: S,
+): Promise<z.infer<S>> {
+  return schema.parse(await response.json());
 }
 
 async function request(path: string, init?: RequestInit): Promise<Response> {
@@ -17,22 +25,13 @@ async function setUpRoundWithOneScore() {
     layoutName: "Blue",
     holes: [{ number: 1, par: 3 }],
   });
-  const player = await json<{ id: number }>(
-    await request("/api/players", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Alice" }),
-    }),
-  );
-  const round = await json<{
-    id: number;
-    scores: Array<{
-      id: number;
-      strokes: number;
-      penalties: number;
-      recorded: boolean;
-    }>;
-  }>(
+  const playerResponse = await request("/api/players", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Alice" }),
+  });
+  const player = (await playerResponse.json()) as { id: number };
+  const round = await json(
     await request("/api/rounds", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -42,6 +41,7 @@ async function setUpRoundWithOneScore() {
         playerIds: [player.id],
       }),
     }),
+    roundDetailSchema,
   );
   return { roundId: round.id, score: round.scores[0] };
 }
@@ -71,11 +71,7 @@ describe("hole-scores API", () => {
       body: JSON.stringify({ strokes: 4 }),
     });
     expect(res.status).toBe(200);
-    const updated = await json<{
-      strokes: number;
-      penalties: number;
-      recorded: boolean;
-    }>(res);
+    const updated = await json(res, holeScoreResponseSchema);
     expect(updated).toMatchObject({ strokes: 4, penalties: 0, recorded: true });
   });
 
@@ -87,11 +83,7 @@ describe("hole-scores API", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ penalties: 2 }),
     });
-    const updated = await json<{
-      strokes: number;
-      penalties: number;
-      recorded: boolean;
-    }>(res);
+    const updated = await json(res, holeScoreResponseSchema);
     expect(updated).toMatchObject({ strokes: 3, penalties: 2, recorded: true });
   });
 

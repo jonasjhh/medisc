@@ -1,47 +1,28 @@
 import { deleteRequest, patchJson, postJson, request } from "../api/client";
+import {
+  holeScoreResponseSchema,
+  roundDetailSchema,
+  roundListResponseSchema,
+} from "../../shared/contracts/rounds";
+import type {
+  HoleScoreResponse,
+  RoundDetail,
+  RoundHole,
+  RoundListResponse,
+  RoundPlayer,
+  RoundScore,
+  RoundSummary,
+} from "../../shared/contracts/rounds";
 
-export interface RoundSummary {
-  id: number;
-  createdAt: string;
-  completedAt: string | null;
-  counting: boolean;
-  courseName: string;
-  layoutName: string;
-  playerCount: number;
-}
-
-export interface RoundHole {
-  id: number;
-  number: number;
-  par: number;
-  distanceMeters: number | null;
-}
-
-export interface RoundPlayer {
-  id: number;
-  name: string;
-}
-
-export interface RoundScore {
-  id: number;
-  holeId: number;
-  playerId: number;
-  strokes: number;
-  penalties: number;
-  recorded: boolean;
-}
-
-export interface RoundDetail {
-  id: number;
-  createdAt: string;
-  completedAt: string | null;
-  counting: boolean;
-  course: { id: number; name: string };
-  layout: { id: number; name: string };
-  holes: RoundHole[];
-  players: RoundPlayer[];
-  scores: RoundScore[];
-}
+export type {
+  HoleScoreResponse,
+  RoundDetail,
+  RoundHole,
+  RoundListResponse,
+  RoundPlayer,
+  RoundScore,
+  RoundSummary,
+};
 
 export interface RoundFilters {
   status?: "in_progress" | "completed";
@@ -49,9 +30,9 @@ export interface RoundFilters {
   courseId?: number;
 }
 
-export function listRounds(
+export async function listRounds(
   filters: RoundFilters = {},
-): Promise<{ rounds: RoundSummary[] }> {
+): Promise<RoundListResponse> {
   const params = new URLSearchParams();
   if (filters.status) {
     params.set("status", filters.status);
@@ -63,40 +44,54 @@ export function listRounds(
     params.set("courseId", String(filters.courseId));
   }
   const query = params.toString();
-  return request(`/api/rounds${query ? `?${query}` : ""}`);
+  return roundListResponseSchema.parse(
+    await request(`/api/rounds${query ? `?${query}` : ""}`),
+  );
 }
 
-export function createRound(
+export async function createRound(
   input: { courseId: number; layoutId: number; playerIds: number[] },
   idempotencyKey: string,
 ): Promise<RoundDetail> {
-  return postJson("/api/rounds", input, { "Idempotency-Key": idempotencyKey });
+  return roundDetailSchema.parse(
+    await postJson("/api/rounds", input, {
+      "Idempotency-Key": idempotencyKey,
+    }),
+  );
 }
 
-export function getRound(roundId: number): Promise<RoundDetail> {
-  return request(`/api/rounds/${roundId}`);
+export async function getRound(roundId: number): Promise<RoundDetail> {
+  return roundDetailSchema.parse(await request(`/api/rounds/${roundId}`));
 }
 
-export function updateHoleScore(
+export async function updateHoleScore(
   holeScoreId: number,
   input: { strokes?: number; penalties?: number },
-): Promise<RoundScore> {
-  return patchJson(`/api/hole-scores/${holeScoreId}`, input);
+): Promise<HoleScoreResponse> {
+  return holeScoreResponseSchema.parse(
+    await patchJson(`/api/hole-scores/${holeScoreId}`, input),
+  );
 }
 
-export function completeRound(roundId: number): Promise<RoundDetail> {
-  return postJson(`/api/rounds/${roundId}/complete`, {});
+export async function completeRound(roundId: number): Promise<RoundDetail> {
+  return roundDetailSchema.parse(
+    await postJson(`/api/rounds/${roundId}/complete`, {}),
+  );
 }
 
-export function reopenRound(roundId: number): Promise<RoundDetail> {
-  return postJson(`/api/rounds/${roundId}/reopen`, {});
+export async function reopenRound(roundId: number): Promise<RoundDetail> {
+  return roundDetailSchema.parse(
+    await postJson(`/api/rounds/${roundId}/reopen`, {}),
+  );
 }
 
-export function updateRound(
+export async function updateRound(
   roundId: number,
   input: { playerIds?: number[]; counting?: boolean },
 ): Promise<RoundDetail> {
-  return patchJson(`/api/rounds/${roundId}`, input);
+  return roundDetailSchema.parse(
+    await patchJson(`/api/rounds/${roundId}`, input),
+  );
 }
 
 export function deleteRound(roundId: number): Promise<void> {

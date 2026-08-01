@@ -144,6 +144,7 @@ describe("RoundPage", () => {
   it("increments strokes and saves the change", async () => {
     vi.mocked(roundsApi.updateHoleScore).mockResolvedValue({
       id: 1000,
+      roundId: 1,
       holeId: 100,
       playerId: 1,
       strokes: 4,
@@ -355,6 +356,7 @@ describe("RoundPage", () => {
   it("sets strokes to par with the quick-score buttons", async () => {
     vi.mocked(roundsApi.updateHoleScore).mockResolvedValue({
       id: 1000,
+      roundId: 1,
       holeId: 100,
       playerId: 1,
       strokes: 3,

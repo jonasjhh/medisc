@@ -1,10 +1,18 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { ZodTypeAny, z } from "zod";
 import app from "../index";
 import { seedCourse } from "../test/seed";
+import {
+  roundDetailSchema,
+  roundListResponseSchema,
+} from "../../shared/contracts/rounds";
 
-async function json<T>(response: Response): Promise<T> {
-  return response.json() as Promise<T>;
+async function json<S extends ZodTypeAny>(
+  response: Response,
+  schema: S,
+): Promise<z.infer<S>> {
+  return schema.parse(await response.json());
 }
 
 async function request(path: string, init?: RequestInit): Promise<Response> {
@@ -23,13 +31,12 @@ function setUpCourseWithTwoHoles() {
 }
 
 async function createPlayer(name: string) {
-  const player = await json<{ id: number; name: string }>(
-    await request("/api/players", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name }),
-    }),
-  );
+  const response = await request("/api/players", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  const player = (await response.json()) as { id: number; name: string };
   return player;
 }
 
@@ -59,20 +66,7 @@ describe("rounds API", () => {
       }),
     });
     expect(res.status).toBe(201);
-    const round = await json<{
-      course: { name: string };
-      layout: { name: string };
-      counting: boolean;
-      holes: Array<{ id: number; number: number; par: number }>;
-      players: Array<{ id: number; name: string }>;
-      scores: Array<{
-        holeId: number;
-        playerId: number;
-        strokes: number;
-        penalties: number;
-        recorded: boolean;
-      }>;
-    }>(res);
+    const round = await json(res, roundDetailSchema);
 
     expect(round.course.name).toBe("Maple Hill");
     expect(round.layout.name).toBe("Blue");
@@ -107,7 +101,7 @@ describe("rounds API", () => {
       body,
     });
     expect(first.status).toBe(201);
-    const firstRound = await json<{ id: number; scores: unknown[] }>(first);
+    const firstRound = await json(first, roundDetailSchema);
 
     const retry = await request("/api/rounds", {
       method: "POST",
@@ -115,7 +109,7 @@ describe("rounds API", () => {
       body,
     });
     expect(retry.status).toBe(200);
-    const retryRound = await json<{ id: number; scores: unknown[] }>(retry);
+    const retryRound = await json(retry, roundDetailSchema);
     expect(retryRound.id).toBe(firstRound.id);
 
     const { results: rounds } = await env.DB.prepare(
@@ -148,8 +142,8 @@ describe("rounds API", () => {
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
 
-    const firstRound = await json<{ id: number }>(first);
-    const secondRound = await json<{ id: number }>(second);
+    const firstRound = await json(first, roundDetailSchema);
+    const secondRound = await json(second, roundDetailSchema);
     expect(firstRound.id).not.toBe(secondRound.id);
   });
 
@@ -194,9 +188,7 @@ describe("rounds API", () => {
     });
 
     const res = await request("/api/rounds");
-    const { rounds } = await json<{
-      rounds: Array<{ courseName: string; playerCount: number }>;
-    }>(res);
+    const { rounds } = await json(res, roundListResponseSchema);
     expect(rounds).toHaveLength(1);
     expect(rounds[0]).toMatchObject({
       courseName: "Maple Hill",
@@ -212,12 +204,13 @@ describe("rounds API", () => {
   it("finishes a round, setting completedAt", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
-    const created = await json<{ id: number; completedAt: string | null }>(
+    const created = await json(
       await request("/api/rounds", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
       }),
+      roundDetailSchema,
     );
     expect(created.completedAt).toBeNull();
 
@@ -225,7 +218,7 @@ describe("rounds API", () => {
       method: "POST",
     });
     expect(res.status).toBe(200);
-    const completed = await json<{ completedAt: string | null }>(res);
+    const completed = await json(res, roundDetailSchema);
     expect(completed.completedAt).not.toBeNull();
   });
 
@@ -237,15 +230,13 @@ describe("rounds API", () => {
   it("reopens a completed round and allows editing scores again", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
-    const created = await json<{
-      id: number;
-      scores: Array<{ id: number }>;
-    }>(
+    const created = await json(
       await request("/api/rounds", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
       }),
+      roundDetailSchema,
     );
     await request(`/api/rounds/${created.id}/complete`, { method: "POST" });
 
@@ -253,7 +244,7 @@ describe("rounds API", () => {
       method: "POST",
     });
     expect(res.status).toBe(200);
-    const reopened = await json<{ completedAt: string | null }>(res);
+    const reopened = await json(res, roundDetailSchema);
     expect(reopened.completedAt).toBeNull();
 
     const scoreRes = await request(`/api/hole-scores/${created.scores[0].id}`, {
@@ -267,19 +258,20 @@ describe("rounds API", () => {
   it("is a no-op reopening a round that's already in progress", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
-    const created = await json<{ id: number }>(
+    const created = await json(
       await request("/api/rounds", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
       }),
+      roundDetailSchema,
     );
 
     const res = await request(`/api/rounds/${created.id}/reopen`, {
       method: "POST",
     });
     expect(res.status).toBe(200);
-    const reopened = await json<{ completedAt: string | null }>(res);
+    const reopened = await json(res, roundDetailSchema);
     expect(reopened.completedAt).toBeNull();
   });
 
@@ -291,12 +283,13 @@ describe("rounds API", () => {
   it("deletes a round along with its players and scores", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
-    const created = await json<{ id: number }>(
+    const created = await json(
       await request("/api/rounds", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
       }),
+      roundDetailSchema,
     );
 
     const res = await request(`/api/rounds/${created.id}`, {
@@ -307,8 +300,9 @@ describe("rounds API", () => {
     const getRes = await request(`/api/rounds/${created.id}`);
     expect(getRes.status).toBe(404);
 
-    const listRes = await json<{ rounds: unknown[] }>(
+    const listRes = await json(
       await request("/api/rounds"),
+      roundListResponseSchema,
     );
     expect(listRes.rounds).toHaveLength(0);
   });
@@ -316,12 +310,13 @@ describe("rounds API", () => {
   it("allows deleting a completed round", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
-    const created = await json<{ id: number }>(
+    const created = await json(
       await request("/api/rounds", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
       }),
+      roundDetailSchema,
     );
     await request(`/api/rounds/${created.id}/complete`, { method: "POST" });
 
@@ -345,12 +340,13 @@ describe("rounds API", () => {
     const alice = await createPlayer("Alice");
     const bob = await createPlayer("Bob");
 
-    const roundA = await json<{ id: number }>(
+    const roundA = await json(
       await request("/api/rounds", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
       }),
+      roundDetailSchema,
     );
     await request(`/api/rounds/${roundA.id}/complete`, { method: "POST" });
 
@@ -360,23 +356,27 @@ describe("rounds API", () => {
       body: JSON.stringify({ courseId, layoutId, playerIds: [bob.id] }),
     });
 
-    const completedRes = await json<{ rounds: unknown[] }>(
+    const completedRes = await json(
       await request("/api/rounds?status=completed"),
+      roundListResponseSchema,
     );
     expect(completedRes.rounds).toHaveLength(1);
 
-    const inProgressRes = await json<{ rounds: unknown[] }>(
+    const inProgressRes = await json(
       await request("/api/rounds?status=in_progress"),
+      roundListResponseSchema,
     );
     expect(inProgressRes.rounds).toHaveLength(1);
 
-    const aliceRes = await json<{ rounds: unknown[] }>(
+    const aliceRes = await json(
       await request(`/api/rounds?playerId=${alice.id}`),
+      roundListResponseSchema,
     );
     expect(aliceRes.rounds).toHaveLength(1);
 
-    const otherCourseRes = await json<{ rounds: unknown[] }>(
+    const otherCourseRes = await json(
       await request(`/api/rounds?courseId=${otherCourseId}`),
+      roundListResponseSchema,
     );
     expect(otherCourseRes.rounds).toHaveLength(0);
   });
@@ -385,12 +385,13 @@ describe("rounds API", () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
     const bob = await createPlayer("Bob");
-    const round = await json<{ id: number }>(
+    const round = await json(
       await request("/api/rounds", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
       }),
+      roundDetailSchema,
     );
 
     const res = await request(`/api/rounds/${round.id}`, {
@@ -399,10 +400,7 @@ describe("rounds API", () => {
       body: JSON.stringify({ playerIds: [bob.id] }),
     });
     expect(res.status).toBe(200);
-    const updated = await json<{
-      players: Array<{ id: number; name: string }>;
-      scores: Array<{ playerId: number; recorded: boolean }>;
-    }>(res);
+    const updated = await json(res, roundDetailSchema);
     expect(updated.players).toEqual([{ id: bob.id, name: "Bob" }]);
     expect(updated.scores.every((score) => score.playerId === bob.id)).toBe(
       true,
@@ -417,12 +415,13 @@ describe("rounds API", () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
     const bob = await createPlayer("Bob");
-    const round = await json<{ id: number }>(
+    const round = await json(
       await request("/api/rounds", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
       }),
+      roundDetailSchema,
     );
     await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
 
@@ -437,12 +436,13 @@ describe("rounds API", () => {
   it("409s when toggling the counting flag on a completed round", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
-    const round = await json<{ id: number }>(
+    const round = await json(
       await request("/api/rounds", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
       }),
+      roundDetailSchema,
     );
     await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
 
@@ -457,12 +457,13 @@ describe("rounds API", () => {
   it("toggles the counting flag once a completed round is reopened", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
-    const round = await json<{ id: number }>(
+    const round = await json(
       await request("/api/rounds", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
       }),
+      roundDetailSchema,
     );
     await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
     await request(`/api/rounds/${round.id}/reopen`, { method: "POST" });
@@ -473,7 +474,7 @@ describe("rounds API", () => {
       body: JSON.stringify({ counting: false }),
     });
     expect(res.status).toBe(200);
-    const updated = await json<{ counting: boolean }>(res);
+    const updated = await json(res, roundDetailSchema);
     expect(updated.counting).toBe(false);
   });
 
@@ -489,12 +490,13 @@ describe("rounds API", () => {
   it("rejects a PATCH body with neither field", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
-    const round = await json<{ id: number }>(
+    const round = await json(
       await request("/api/rounds", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
       }),
+      roundDetailSchema,
     );
 
     const res = await request(`/api/rounds/${round.id}`, {
