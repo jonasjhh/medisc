@@ -6,8 +6,10 @@ import { ThemeModeProvider } from "./app/ThemeModeContext";
 import { InstallPromptProvider } from "./app/InstallPromptContext";
 import { IdentityProvider } from "./identity/IdentityContext";
 import * as identityApi from "./identity/api";
+import * as playersApi from "./players/api";
 
 vi.mock("./identity/api");
+vi.mock("./players/api");
 
 function dispatchBeforeInstallPrompt() {
   const event = new Event("beforeinstallprompt", {
@@ -87,6 +89,83 @@ describe("App", () => {
     expect(
       screen.queryByRole("heading", { name: /set up your profile/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("opens onboarding from the theme menu when no user exists yet", async () => {
+    localStorage.setItem("medisc-welcome-dismissed", "1");
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("heading", { name: /medisc/i });
+
+    await user.click(screen.getByRole("button", { name: /theme mode/i }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: /set up profile/i }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: /set up your profile/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the claim step from the theme menu when a user exists without a claimed player", async () => {
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({
+      user: { id: 1, createdAt: "", claimedPlayer: null },
+    });
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({ players: [] });
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("heading", { name: /medisc/i });
+
+    await user.click(screen.getByRole("button", { name: /theme mode/i }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: /claim a guest profile/i }),
+    );
+
+    expect(await screen.findByText("Is one of these you?")).toBeInTheDocument();
+  });
+
+  it("opens the unclaim dialog from the theme menu when a player is claimed", async () => {
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({
+      user: {
+        id: 1,
+        createdAt: "",
+        claimedPlayer: { id: 10, name: "Alice" },
+      },
+    });
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("heading", { name: /medisc/i });
+
+    await user.click(screen.getByRole("button", { name: /theme mode/i }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: /this isn't me/i }),
+    );
+
+    expect(await screen.findByText("This isn't me")).toBeInTheDocument();
+    expect(screen.getByText(/Alice/)).toBeInTheDocument();
+  });
+
+  it("opens the link-device dialog from the theme menu", async () => {
+    vi.mocked(identityApi.getCurrentUser).mockResolvedValue({
+      user: { id: 1, createdAt: "", claimedPlayer: null },
+    });
+    vi.mocked(identityApi.createLinkCode).mockResolvedValue({
+      code: "ABCDEFGH",
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    });
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("heading", { name: /medisc/i });
+
+    await user.click(screen.getByRole("button", { name: /theme mode/i }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: /link another device/i }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: /link another device/i }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("ABCDEFGH")).toBeInTheDocument();
   });
 
   it("shows the install prompt before the onboarding modal, never both at once", async () => {

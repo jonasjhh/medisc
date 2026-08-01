@@ -60,6 +60,11 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     css: true,
+    // Without this, vi.fn() call history survives across tests in the same
+    // file (RTL's automatic unmount doesn't reset mocks), so assertions like
+    // "not called" or exact call counts are only reliable if nothing earlier
+    // in the file touched the same mock.
+    clearMocks: true,
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],

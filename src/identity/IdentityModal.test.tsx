@@ -163,6 +163,24 @@ describe("IdentityModal", () => {
     expect(playersApi.listPlayers).not.toHaveBeenCalled();
   });
 
+  it("shows an error when the unclaimed players list fails to load", async () => {
+    vi.mocked(identityApi.createUser).mockResolvedValue({
+      user: { id: 1, createdAt: "", claimedPlayer: null },
+    });
+    vi.mocked(playersApi.listPlayers).mockRejectedValue(
+      new Error("network down"),
+    );
+    const user = userEvent.setup();
+    renderModal("welcome");
+
+    await user.click(screen.getByRole("button", { name: "open" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Get Started" }),
+    );
+
+    expect(await screen.findByText("network down")).toBeInTheDocument();
+  });
+
   it("opens directly at the claim step", async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue({
       players: [

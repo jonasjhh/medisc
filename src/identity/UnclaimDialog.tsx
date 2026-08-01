@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
@@ -17,13 +18,17 @@ export function UnclaimDialog({
 }) {
   const { user, applyUser } = useIdentity();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleConfirm = async () => {
     setBusy(true);
+    setError(null);
     try {
       const { user: updated } = await unclaimPlayer();
       applyUser(updated);
       onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove link");
     } finally {
       setBusy(false);
     }
@@ -38,6 +43,11 @@ export function UnclaimDialog({
           {user?.claimedPlayer?.name ?? "this player"}? You can claim a
           different player afterward.
         </DialogContentText>
+        {error && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>

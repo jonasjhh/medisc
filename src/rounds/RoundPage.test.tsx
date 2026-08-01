@@ -159,6 +159,31 @@ describe("RoundPage", () => {
     });
   });
 
+  it("shows an error instead of the round when it fails to load", async () => {
+    vi.mocked(roundsApi.getRound).mockRejectedValue(
+      new Error("round not found"),
+    );
+    renderPage();
+
+    expect(await screen.findByText("round not found")).toBeInTheDocument();
+    expect(screen.queryByText("Hole 1")).not.toBeInTheDocument();
+  });
+
+  it("shows an inline error banner when saving a score fails", async () => {
+    vi.mocked(roundsApi.updateHoleScore).mockRejectedValue(
+      new Error("save failed"),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: /increase strokes/i }));
+
+    expect(await screen.findByText("save failed")).toBeInTheDocument();
+    // The failed save triggers a refresh, restoring the server's score.
+    expect(roundsApi.getRound).toHaveBeenCalledTimes(2);
+  });
+
   it("does not let strokes go below 1", async () => {
     const roundAtMin: roundsApi.RoundDetail = {
       ...baseRound,

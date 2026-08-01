@@ -40,9 +40,11 @@ export function IdentityModal() {
 
   useEffect(() => {
     if (!isOnboardingOpen || step !== "claim") return;
-    listPlayers({ unclaimed: true }).then(({ players }) =>
-      setUnclaimedPlayers(players),
-    );
+    listPlayers({ unclaimed: true })
+      .then(({ players }) => setUnclaimedPlayers(players))
+      .catch((e) =>
+        setError(e instanceof Error ? e.message : "Could not load players"),
+      );
   }, [isOnboardingOpen, step]);
 
   function afterResolved(resolvedUser: NonNullable<typeof user>) {

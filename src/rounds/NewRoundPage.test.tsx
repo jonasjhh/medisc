@@ -119,7 +119,6 @@ describe("NewRoundPage", () => {
 
   it("retries with the same idempotency key when the selections haven't changed", async () => {
     const createRoundMock = vi.mocked(roundsApi.createRound);
-    const callsBefore = createRoundMock.mock.calls.length;
     createRoundMock
       .mockRejectedValueOnce(new Error("network error"))
       .mockResolvedValueOnce({
@@ -144,15 +143,15 @@ describe("NewRoundPage", () => {
 
     await user.click(screen.getByRole("button", { name: /start round/i }));
     await waitFor(() => {
-      expect(createRoundMock.mock.calls.length).toBe(callsBefore + 1);
+      expect(createRoundMock).toHaveBeenCalledTimes(1);
     });
     await user.click(screen.getByRole("button", { name: /start round/i }));
     await waitFor(() => {
-      expect(createRoundMock.mock.calls.length).toBe(callsBefore + 2);
+      expect(createRoundMock).toHaveBeenCalledTimes(2);
     });
 
-    const [, firstKey] = createRoundMock.mock.calls[callsBefore];
-    const [, secondKey] = createRoundMock.mock.calls[callsBefore + 1];
+    const [, firstKey] = createRoundMock.mock.calls[0];
+    const [, secondKey] = createRoundMock.mock.calls[1];
     expect(secondKey).toBe(firstKey);
   });
 
@@ -215,8 +214,6 @@ describe("NewRoundPage", () => {
   });
 
   it("hides the recent courses section without a claimed player", async () => {
-    const callsBefore = vi.mocked(playersApi.getRecentCourses).mock.calls
-      .length;
     vi.mocked(playersApi.getRecentCourses).mockResolvedValue({
       recentCourses: [
         {
@@ -230,9 +227,7 @@ describe("NewRoundPage", () => {
     renderPage();
 
     await screen.findByText("Alice");
-    expect(vi.mocked(playersApi.getRecentCourses).mock.calls.length).toBe(
-      callsBefore,
-    );
+    expect(playersApi.getRecentCourses).not.toHaveBeenCalled();
     expect(screen.queryByText("Recent courses")).not.toBeInTheDocument();
   });
 
