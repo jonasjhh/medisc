@@ -6,7 +6,9 @@ import { HomePage } from "./HomePage";
 describe("HomePage", () => {
   it("renders the app name and navigation links", () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <HomePage />
       </MemoryRouter>,
     );

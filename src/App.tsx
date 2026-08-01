@@ -33,12 +33,12 @@ import { PlayersListPage } from "./players/PlayersListPage";
 import { PlayerStatsPage } from "./players/PlayerStatsPage";
 import { InstallPrompt } from "./app/InstallPrompt";
 import { UpdatePrompt } from "./app/UpdatePrompt";
-import { useThemeMode } from "./app/ThemeModeContext";
-import type { ThemeModePreference } from "./app/ThemeModeContext";
+import { useThemeMode } from "./app/useThemeMode";
+import type { ThemeModePreference } from "./app/useThemeMode";
 import { IdentityModal } from "./identity/IdentityModal";
 import { LinkCodeDialog } from "./identity/LinkCodeDialog";
 import { UnclaimDialog } from "./identity/UnclaimDialog";
-import { useIdentity } from "./identity/IdentityContext";
+import { useIdentity } from "./identity/useIdentity";
 
 const modeIcons: Record<ThemeModePreference, typeof LightModeIcon> = {
   light: LightModeIcon,

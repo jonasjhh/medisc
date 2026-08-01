@@ -46,7 +46,9 @@ describe("RoundsListPage", () => {
     });
 
     render(
-      <MemoryRouter>
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <RoundsListPage />
       </MemoryRouter>,
     );
@@ -72,7 +74,9 @@ describe("RoundsListPage", () => {
     });
 
     render(
-      <MemoryRouter>
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <RoundsListPage />
       </MemoryRouter>,
     );
@@ -84,7 +88,9 @@ describe("RoundsListPage", () => {
     vi.mocked(roundsApi.listRounds).mockResolvedValue({ rounds: [] });
 
     render(
-      <MemoryRouter>
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <RoundsListPage />
       </MemoryRouter>,
     );
@@ -99,7 +105,9 @@ describe("RoundsListPage", () => {
     const user = userEvent.setup();
 
     render(
-      <MemoryRouter>
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <RoundsListPage />
       </MemoryRouter>,
     );
@@ -133,7 +141,9 @@ describe("RoundsListPage", () => {
     const user = userEvent.setup();
 
     render(
-      <MemoryRouter>
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <RoundsListPage />
       </MemoryRouter>,
     );
@@ -169,7 +179,9 @@ describe("RoundsListPage", () => {
     const user = userEvent.setup();
 
     render(
-      <MemoryRouter>
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <RoundsListPage />
       </MemoryRouter>,
     );

@@ -1,24 +1,8 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
-
-export type ThemeModePreference = "light" | "dark" | "system";
-type ResolvedMode = "light" | "dark";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ThemeModeContext } from "./useThemeMode";
+import type { ResolvedMode, ThemeModePreference } from "./useThemeMode";
 
 const STORAGE_KEY = "medisc-theme-mode";
-
-interface ThemeModeContextValue {
-  preference: ThemeModePreference;
-  resolvedMode: ResolvedMode;
-  setPreference: (preference: ThemeModePreference) => void;
-}
-
-const ThemeModeContext = createContext<ThemeModeContextValue | null>(null);
 
 function readStoredPreference(): ThemeModePreference {
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -65,12 +49,4 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
       {children}
     </ThemeModeContext.Provider>
   );
-}
-
-export function useThemeMode(): ThemeModeContextValue {
-  const context = useContext(ThemeModeContext);
-  if (!context) {
-    throw new Error("useThemeMode must be used within a ThemeModeProvider");
-  }
-  return context;
 }

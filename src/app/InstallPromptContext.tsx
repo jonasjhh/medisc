@@ -1,12 +1,11 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
+import { InstallPromptContext } from "./useInstallPromptContext";
 
 // Not yet part of lib.dom.d.ts; supported by Chromium-based browsers.
 interface BeforeInstallPromptEvent extends Event {
@@ -23,16 +22,6 @@ declare global {
     beforeinstallprompt: BeforeInstallPromptEvent;
   }
 }
-
-interface InstallPromptContextValue {
-  canInstall: boolean;
-  promptInstall: () => Promise<void>;
-  dismiss: () => void;
-}
-
-const InstallPromptContext = createContext<InstallPromptContextValue | null>(
-  null,
-);
 
 // Captures the browser's install prompt so it can be triggered from our own
 // UI instead of the browser's default mini-infobar. The event can only be
@@ -87,14 +76,4 @@ export function InstallPromptProvider({ children }: { children: ReactNode }) {
       {children}
     </InstallPromptContext.Provider>
   );
-}
-
-export function useInstallPromptContext(): InstallPromptContextValue {
-  const context = useContext(InstallPromptContext);
-  if (!context) {
-    throw new Error(
-      "useInstallPromptContext must be used within an InstallPromptProvider",
-    );
-  }
-  return context;
 }

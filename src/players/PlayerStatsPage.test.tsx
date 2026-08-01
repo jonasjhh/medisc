@@ -13,7 +13,10 @@ vi.mock("../identity/api");
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={["/players/1"]}>
+    <MemoryRouter
+      initialEntries={["/players/1"]}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <InstallPromptProvider>
         <IdentityProvider>
           <Routes>

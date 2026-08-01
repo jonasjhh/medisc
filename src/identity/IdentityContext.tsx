@@ -1,30 +1,11 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { getCurrentUser } from "./api";
 import type { IdentityUser } from "./api";
-import { useInstallPromptContext } from "../app/InstallPromptContext";
+import { IdentityContext } from "./useIdentity";
+import type { OnboardingStep } from "./useIdentity";
+import { useInstallPromptContext } from "../app/useInstallPromptContext";
 
 const DISMISSED_KEY = "medisc-welcome-dismissed";
-
-export type OnboardingStep = "welcome" | "claim";
-
-interface IdentityContextValue {
-  status: "loading" | "ready";
-  user: IdentityUser | null;
-  isOnboardingOpen: boolean;
-  onboardingStep: OnboardingStep;
-  openOnboarding: (step?: OnboardingStep) => void;
-  closeOnboarding: () => void;
-  applyUser: (user: IdentityUser) => void;
-}
-
-const IdentityContext = createContext<IdentityContextValue | null>(null);
 
 export function IdentityProvider({ children }: { children: ReactNode }) {
   const { canInstall } = useInstallPromptContext();
@@ -96,12 +77,4 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
       {children}
     </IdentityContext.Provider>
   );
-}
-
-export function useIdentity(): IdentityContextValue {
-  const context = useContext(IdentityContext);
-  if (!context) {
-    throw new Error("useIdentity must be used within an IdentityProvider");
-  }
-  return context;
 }

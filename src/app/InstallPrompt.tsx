@@ -3,7 +3,7 @@ import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import Snackbar from "@mui/material/Snackbar";
-import { useInstallPromptContext } from "./InstallPromptContext";
+import { useInstallPromptContext } from "./useInstallPromptContext";
 
 export function InstallPrompt() {
   const { canInstall, promptInstall, dismiss } = useInstallPromptContext();

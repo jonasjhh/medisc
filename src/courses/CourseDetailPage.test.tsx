@@ -44,7 +44,10 @@ const eighteenHoleCourse: api.CourseDetail = {
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={["/courses/1"]}>
+    <MemoryRouter
+      initialEntries={["/courses/1"]}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <Routes>
         <Route path="/courses/:courseId" element={<CourseDetailPage />} />
       </Routes>

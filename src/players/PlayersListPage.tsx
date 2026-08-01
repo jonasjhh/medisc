@@ -22,7 +22,7 @@ import { AddPlayerForm } from "./AddPlayerForm";
 import { deletePlayer, listPlayers, updatePlayer } from "./api";
 import type { Player } from "./api";
 import { ClaimedStatusChip } from "./ClaimedStatusChip";
-import { useIdentity } from "../identity/IdentityContext";
+import { useIdentity } from "../identity/useIdentity";
 import { ConfirmDeleteDialog } from "../shared/ConfirmDeleteDialog";
 import type { Status } from "../shared/status";
 

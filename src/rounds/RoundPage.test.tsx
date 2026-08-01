@@ -67,7 +67,10 @@ const twelveHoleRound: roundsApi.RoundDetail = {
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={["/rounds/1"]}>
+    <MemoryRouter
+      initialEntries={["/rounds/1"]}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <Routes>
         <Route path="/rounds" element={<div>Rounds list page</div>} />
         <Route path="/rounds/:roundId" element={<RoundPage />} />

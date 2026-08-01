@@ -7,7 +7,7 @@ import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
 import { unclaimPlayer } from "./api";
-import { useIdentity } from "./IdentityContext";
+import { useIdentity } from "./useIdentity";
 
 export function UnclaimDialog({
   open,

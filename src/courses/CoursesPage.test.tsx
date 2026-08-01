@@ -15,7 +15,9 @@ describe("CoursesPage", () => {
 
   it("lists existing courses", async () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <CoursesPage />
       </MemoryRouter>,
     );
@@ -28,7 +30,9 @@ describe("CoursesPage", () => {
     vi.mocked(api.listCourses).mockResolvedValue({ courses: [] });
 
     render(
-      <MemoryRouter>
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <CoursesPage />
       </MemoryRouter>,
     );

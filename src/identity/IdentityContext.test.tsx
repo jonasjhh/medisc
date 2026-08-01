@@ -1,7 +1,8 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { IdentityProvider, useIdentity } from "./IdentityContext";
+import { IdentityProvider } from "./IdentityContext";
+import { useIdentity } from "./useIdentity";
 import * as identityApi from "./api";
 import { InstallPromptProvider } from "../app/InstallPromptContext";
 

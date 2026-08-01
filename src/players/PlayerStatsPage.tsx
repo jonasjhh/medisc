@@ -20,7 +20,7 @@ import Typography from "@mui/material/Typography";
 import { getPlayerLayouts, getPlayerStats, listPlayers } from "./api";
 import type { HoleStat, Player, PlayedLayout } from "./api";
 import { ClaimedStatusChip } from "./ClaimedStatusChip";
-import { useIdentity } from "../identity/IdentityContext";
+import { useIdentity } from "../identity/useIdentity";
 import type { Status } from "../shared/status";
 
 export function PlayerStatsPage() {

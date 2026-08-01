@@ -45,7 +45,10 @@ describe("NewRoundPage", () => {
 
   function renderPage() {
     return render(
-      <MemoryRouter initialEntries={["/rounds/new"]}>
+      <MemoryRouter
+        initialEntries={["/rounds/new"]}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <InstallPromptProvider>
           <IdentityProvider>
             <Routes>

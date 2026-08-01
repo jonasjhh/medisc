@@ -20,7 +20,7 @@ import { AddPlayerForm } from "../players/AddPlayerForm";
 import { getRecentCourses, listPlayers } from "../players/api";
 import type { Player, PlayedLayout } from "../players/api";
 import { createRound } from "./api";
-import { useIdentity } from "../identity/IdentityContext";
+import { useIdentity } from "../identity/useIdentity";
 import type { Status } from "../shared/status";
 
 export function NewRoundPage() {
