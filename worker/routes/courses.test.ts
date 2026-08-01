@@ -1,10 +1,18 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { ZodTypeAny, z } from "zod";
 import app from "../index";
 import { seedCourse } from "../test/seed";
+import {
+  courseDetailSchema,
+  courseListResponseSchema,
+} from "../../shared/contracts/courses";
 
-async function json<T>(response: Response): Promise<T> {
-  return response.json() as Promise<T>;
+async function json<S extends ZodTypeAny>(
+  response: Response,
+  schema: S,
+): Promise<z.infer<S>> {
+  return schema.parse(await response.json());
 }
 
 describe("courses API", () => {
@@ -23,9 +31,7 @@ describe("courses API", () => {
 
     const res = await app.request("/api/courses", {}, env);
     expect(res.status).toBe(200);
-    const { courses } = await json<{
-      courses: Array<{ name: string; layoutCount: number }>;
-    }>(res);
+    const { courses } = await json(res, courseListResponseSchema);
     expect(courses).toEqual([
       expect.objectContaining({ name: "Maple Hill", layoutCount: 1 }),
     ]);
@@ -40,17 +46,7 @@ describe("courses API", () => {
 
     const res = await app.request(`/api/courses/${courseId}`, {}, env);
     expect(res.status).toBe(200);
-    const detail = await json<{
-      name: string;
-      layouts: Array<{
-        name: string;
-        holes: Array<{
-          number: number;
-          par: number;
-          distanceMeters: number | null;
-        }>;
-      }>;
-    }>(res);
+    const detail = await json(res, courseDetailSchema);
     expect(detail.name).toBe("Maple Hill");
     expect(detail.layouts).toHaveLength(1);
     expect(detail.layouts[0]).toMatchObject({

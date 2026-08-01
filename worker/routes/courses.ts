@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types";
 import { parseIntParam } from "../params";
+import {
+  courseDetailSchema,
+  courseListResponseSchema,
+} from "../../shared/contracts/courses";
 
 interface CourseRow {
   id: number;
@@ -38,14 +42,16 @@ coursesRoute.get("/", async (c) => {
      ORDER BY courses.created_at DESC`,
   ).all<CourseListRow>();
 
-  return c.json({
-    courses: results.map((row) => ({
-      id: row.id,
-      name: row.name,
-      createdAt: row.created_at,
-      layoutCount: row.layout_count,
-    })),
-  });
+  return c.json(
+    courseListResponseSchema.parse({
+      courses: results.map((row) => ({
+        id: row.id,
+        name: row.name,
+        createdAt: row.created_at,
+        layoutCount: row.layout_count,
+      })),
+    }),
+  );
 });
 
 coursesRoute.get("/:courseId", async (c) => {
@@ -91,20 +97,22 @@ coursesRoute.get("/:courseId", async (c) => {
     }
   }
 
-  return c.json({
-    id: course.id,
-    name: course.name,
-    createdAt: course.created_at,
-    layouts: layoutRows.map((layout) => ({
-      id: layout.id,
-      name: layout.name,
-      createdAt: layout.created_at,
-      holes: (holesByLayout.get(layout.id) ?? []).map((hole) => ({
-        id: hole.id,
-        number: hole.number,
-        par: hole.par,
-        distanceMeters: hole.distance_meters,
+  return c.json(
+    courseDetailSchema.parse({
+      id: course.id,
+      name: course.name,
+      createdAt: course.created_at,
+      layouts: layoutRows.map((layout) => ({
+        id: layout.id,
+        name: layout.name,
+        createdAt: layout.created_at,
+        holes: (holesByLayout.get(layout.id) ?? []).map((hole) => ({
+          id: hole.id,
+          number: hole.number,
+          par: hole.par,
+          distanceMeters: hole.distance_meters,
+        })),
       })),
-    })),
-  });
+    }),
+  );
 });
