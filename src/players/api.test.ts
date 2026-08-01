@@ -9,6 +9,51 @@ import {
   listPlayers,
   updatePlayer,
 } from "./api";
+import {
+  holeStatSchema,
+  playedLayoutSchema,
+  playerSchema,
+} from "../../shared/contracts/players";
+import type {
+  HoleStat,
+  PlayedLayout,
+  Player,
+} from "../../shared/contracts/players";
+
+function aPlayer(overrides: Partial<Player> = {}): Player {
+  return playerSchema.parse({
+    id: 1,
+    name: "Alice",
+    createdAt: "",
+    roundCount: 0,
+    claimedByUserId: null,
+    ...overrides,
+  });
+}
+
+function aPlayedLayout(overrides: Partial<PlayedLayout> = {}): PlayedLayout {
+  return playedLayoutSchema.parse({
+    courseId: 1,
+    courseName: "Maple Hill",
+    layoutId: 2,
+    layoutName: "Blue",
+    ...overrides,
+  });
+}
+
+function aHoleStat(overrides: Partial<HoleStat> = {}): HoleStat {
+  return holeStatSchema.parse({
+    holeId: 10,
+    number: 1,
+    par: 3,
+    timesPlayed: 2,
+    avgStrokes: 3.5,
+    bestStrokes: 3,
+    worstStrokes: 4,
+    avgPenalties: 0,
+    ...overrides,
+  });
+}
 
 function mockFetchOnce(body: unknown, init: { ok?: boolean } = {}) {
   const fetchMock = vi.fn().mockResolvedValue({
@@ -34,7 +79,7 @@ function mockNoContentFetchOnce() {
 
 describe("players api", () => {
   it("creates a player", async () => {
-    const fetchMock = mockFetchOnce({ id: 1, name: "Alice", createdAt: "" });
+    const fetchMock = mockFetchOnce(aPlayer({ id: 1, name: "Alice" }));
     await createPlayer("Alice");
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/players",
@@ -46,7 +91,7 @@ describe("players api", () => {
   });
 
   it("renames a player", async () => {
-    const fetchMock = mockFetchOnce({ id: 1, name: "Jon", createdAt: "" });
+    const fetchMock = mockFetchOnce(aPlayer({ id: 1, name: "Jon" }));
     await updatePlayer(1, "Jon");
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/players/1",
@@ -59,12 +104,10 @@ describe("players api", () => {
 
   it("lists players", async () => {
     mockFetchOnce({
-      players: [{ id: 1, name: "Alice", createdAt: "", claimedByUserId: null }],
+      players: [aPlayer({ id: 1, name: "Alice" })],
     });
     const { players } = await listPlayers();
-    expect(players).toEqual([
-      { id: 1, name: "Alice", createdAt: "", claimedByUserId: null },
-    ]);
+    expect(players).toEqual([aPlayer({ id: 1, name: "Alice" })]);
   });
 
   it("lists only unclaimed players when requested", async () => {
@@ -78,14 +121,7 @@ describe("players api", () => {
 
   it("gets the layouts a player has played", async () => {
     const fetchMock = mockFetchOnce({
-      layouts: [
-        {
-          courseId: 1,
-          courseName: "Maple Hill",
-          layoutId: 2,
-          layoutName: "Blue",
-        },
-      ],
+      layouts: [aPlayedLayout()],
     });
     const { layouts } = await getPlayerLayouts(1);
     expect(layouts).toHaveLength(1);
@@ -97,14 +133,7 @@ describe("players api", () => {
 
   it("gets a player's recent courses", async () => {
     const fetchMock = mockFetchOnce({
-      recentCourses: [
-        {
-          courseId: 1,
-          courseName: "Maple Hill",
-          layoutId: 2,
-          layoutName: "Blue",
-        },
-      ],
+      recentCourses: [aPlayedLayout()],
     });
     const { recentCourses } = await getRecentCourses(1);
     expect(recentCourses).toHaveLength(1);
@@ -116,7 +145,7 @@ describe("players api", () => {
 
   it("gets a player's hole stats for a layout", async () => {
     const fetchMock = mockFetchOnce({
-      holes: [{ holeId: 10, number: 1, par: 3, timesPlayed: 2 }],
+      holes: [aHoleStat()],
     });
     const { holes } = await getPlayerStats(1, 2);
     expect(holes).toHaveLength(1);
@@ -136,13 +165,9 @@ describe("players api", () => {
   });
 
   it("claims a player", async () => {
-    const fetchMock = mockFetchOnce({
-      id: 1,
-      name: "Alice",
-      createdAt: "",
-      roundCount: 0,
-      claimedByUserId: 5,
-    });
+    const fetchMock = mockFetchOnce(
+      aPlayer({ id: 1, name: "Alice", claimedByUserId: 5 }),
+    );
     await claimPlayer(1);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/players/1/claim",

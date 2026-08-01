@@ -1,70 +1,85 @@
 import { deleteRequest, patchJson, postJson, request } from "../api/client";
+import {
+  holeStatsResponseSchema,
+  playedLayoutsResponseSchema,
+  playerListResponseSchema,
+  playerSchema,
+  recentCoursesResponseSchema,
+} from "../../shared/contracts/players";
+import type {
+  HoleStat,
+  HoleStatsResponse,
+  PlayedLayout,
+  PlayedLayoutsResponse,
+  Player,
+  PlayerListResponse,
+  RecentCoursesResponse,
+} from "../../shared/contracts/players";
 
-export interface Player {
-  id: number;
-  name: string;
-  createdAt: string;
-  roundCount: number;
-  claimedByUserId: number | null;
-}
+export type {
+  HoleStat,
+  HoleStatsResponse,
+  PlayedLayout,
+  PlayedLayoutsResponse,
+  Player,
+  PlayerListResponse,
+  RecentCoursesResponse,
+};
 
-export interface PlayedLayout {
-  courseId: number;
-  courseName: string;
-  layoutId: number;
-  layoutName: string;
-}
-
-export interface HoleStat {
-  holeId: number;
-  number: number;
-  par: number;
-  timesPlayed: number;
-  avgStrokes: number;
-  bestStrokes: number;
-  worstStrokes: number;
-  avgPenalties: number;
-}
-
-export function listPlayers(options?: {
+export async function listPlayers(options?: {
   unclaimed?: boolean;
-}): Promise<{ players: Player[] }> {
-  return request(
-    options?.unclaimed ? "/api/players?unclaimed=true" : "/api/players",
+}): Promise<PlayerListResponse> {
+  return playerListResponseSchema.parse(
+    await request(
+      options?.unclaimed ? "/api/players?unclaimed=true" : "/api/players",
+    ),
   );
 }
 
-export function createPlayer(name: string): Promise<Player> {
-  return postJson("/api/players", { name });
+export async function createPlayer(name: string): Promise<Player> {
+  return playerSchema.parse(await postJson("/api/players", { name }));
 }
 
-export function claimPlayer(playerId: number): Promise<Player> {
-  return postJson(`/api/players/${playerId}/claim`, {});
+export async function claimPlayer(playerId: number): Promise<Player> {
+  return playerSchema.parse(
+    await postJson(`/api/players/${playerId}/claim`, {}),
+  );
 }
 
-export function updatePlayer(playerId: number, name: string): Promise<Player> {
-  return patchJson(`/api/players/${playerId}`, { name });
+export async function updatePlayer(
+  playerId: number,
+  name: string,
+): Promise<Player> {
+  return playerSchema.parse(
+    await patchJson(`/api/players/${playerId}`, { name }),
+  );
 }
 
 export function deletePlayer(playerId: number): Promise<void> {
   return deleteRequest(`/api/players/${playerId}`);
 }
 
-export function getPlayerLayouts(
+export async function getPlayerLayouts(
   playerId: number,
-): Promise<{ layouts: PlayedLayout[] }> {
-  return request(`/api/players/${playerId}/layouts`);
+): Promise<PlayedLayoutsResponse> {
+  return playedLayoutsResponseSchema.parse(
+    await request(`/api/players/${playerId}/layouts`),
+  );
 }
 
-export function getRecentCourses(
+export async function getRecentCourses(
   playerId: number,
-): Promise<{ recentCourses: PlayedLayout[] }> {
-  return request(`/api/players/${playerId}/recent-courses`);
+): Promise<RecentCoursesResponse> {
+  return recentCoursesResponseSchema.parse(
+    await request(`/api/players/${playerId}/recent-courses`),
+  );
 }
 
-export function getPlayerStats(
+export async function getPlayerStats(
   playerId: number,
   layoutId: number,
-): Promise<{ holes: HoleStat[] }> {
-  return request(`/api/players/${playerId}/stats?layoutId=${layoutId}`);
+): Promise<HoleStatsResponse> {
+  return holeStatsResponseSchema.parse(
+    await request(`/api/players/${playerId}/stats?layoutId=${layoutId}`),
+  );
 }

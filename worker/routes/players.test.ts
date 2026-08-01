@@ -1,18 +1,26 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { ZodTypeAny, z } from "zod";
 import app from "../index";
 import { seedCourse, seedUser } from "../test/seed";
+import {
+  playedLayoutsResponseSchema,
+  playerListResponseSchema,
+  playerSchema,
+  recentCoursesResponseSchema,
+  holeStatsResponseSchema,
+} from "../../shared/contracts/players";
+import { roundDetailSchema } from "../../shared/contracts/rounds";
 
-interface PlayerResponse {
-  id: number;
-  name: string;
-  createdAt: string;
-  roundCount: number;
-  claimedByUserId: number | null;
+async function json<S extends ZodTypeAny>(
+  response: Response,
+  schema: S,
+): Promise<z.infer<S>> {
+  return schema.parse(await response.json());
 }
 
-async function json<T>(response: Response): Promise<T> {
-  return response.json() as Promise<T>;
+async function errorOf(response: Response): Promise<{ error: string }> {
+  return (await response.json()) as { error: string };
 }
 
 async function request(path: string, init?: RequestInit): Promise<Response> {
@@ -40,7 +48,7 @@ describe("players API", () => {
       body: JSON.stringify({ name: "Jonas" }),
     });
     expect(createRes.status).toBe(201);
-    const created = await json<PlayerResponse>(createRes);
+    const created = await json(createRes, playerSchema);
     expect(created).toMatchObject({
       name: "Jonas",
       roundCount: 0,
@@ -48,7 +56,7 @@ describe("players API", () => {
     });
 
     const listRes = await request("/api/players");
-    const { players } = await json<{ players: PlayerResponse[] }>(listRes);
+    const { players } = await json(listRes, playerListResponseSchema);
     expect(players).toEqual([
       {
         id: created.id,
@@ -70,12 +78,13 @@ describe("players API", () => {
   });
 
   it("renames a player", async () => {
-    const created = await json<PlayerResponse>(
+    const created = await json(
       await request("/api/players", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Jonas" }),
       }),
+      playerSchema,
     );
 
     const res = await request(`/api/players/${created.id}`, {
@@ -84,11 +93,11 @@ describe("players API", () => {
       body: JSON.stringify({ name: "Jon" }),
     });
     expect(res.status).toBe(200);
-    const updated = await json<PlayerResponse>(res);
+    const updated = await json(res, playerSchema);
     expect(updated).toMatchObject({ id: created.id, name: "Jon" });
 
     const listRes = await request("/api/players");
-    const { players } = await json<{ players: PlayerResponse[] }>(listRes);
+    const { players } = await json(listRes, playerListResponseSchema);
     expect(players[0].name).toBe("Jon");
   });
 
@@ -102,12 +111,13 @@ describe("players API", () => {
   });
 
   it("rejects an empty name on rename", async () => {
-    const created = await json<PlayerResponse>(
+    const created = await json(
       await request("/api/players", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Jonas" }),
       }),
+      playerSchema,
     );
 
     const res = await request(`/api/players/${created.id}`, {
@@ -119,12 +129,13 @@ describe("players API", () => {
   });
 
   it("deletes a player with no recorded rounds", async () => {
-    const created = await json<PlayerResponse>(
+    const created = await json(
       await request("/api/players", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Jonas" }),
       }),
+      playerSchema,
     );
 
     const res = await request(`/api/players/${created.id}`, {
@@ -132,8 +143,9 @@ describe("players API", () => {
     });
     expect(res.status).toBe(204);
 
-    const { players } = await json<{ players: PlayerResponse[] }>(
+    const { players } = await json(
       await request("/api/players"),
+      playerListResponseSchema,
     );
     expect(players).toHaveLength(0);
   });
@@ -149,12 +161,13 @@ describe("players API", () => {
       layoutName: "Blue",
       holes: [{ number: 1, par: 3 }],
     });
-    const player = await json<PlayerResponse>(
+    const player = await json(
       await request("/api/players", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Alice" }),
       }),
+      playerSchema,
     );
     await request("/api/rounds", {
       method: "POST",
@@ -162,8 +175,9 @@ describe("players API", () => {
       body: JSON.stringify({ courseId, layoutId, playerIds: [player.id] }),
     });
 
-    const listRes = await json<{ players: PlayerResponse[] }>(
+    const listRes = await json(
       await request("/api/players"),
+      playerListResponseSchema,
     );
     expect(listRes.players[0].roundCount).toBe(1);
 
@@ -175,27 +189,26 @@ describe("players API", () => {
 
   it("refuses to delete a claimed player even with zero recorded rounds", async () => {
     const { userId, deviceToken } = await seedUser(env);
-    const player = await json<PlayerResponse>(
+    const player = await json(
       await request("/api/players", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Alice" }),
       }),
+      playerSchema,
     );
     const claimRes = await request(`/api/players/${player.id}/claim`, {
       method: "POST",
       headers: { "X-Device-Token": deviceToken },
     });
     expect(claimRes.status).toBe(200);
-    expect((await json<PlayerResponse>(claimRes)).claimedByUserId).toBe(userId);
+    expect((await json(claimRes, playerSchema)).claimedByUserId).toBe(userId);
 
     const res = await request(`/api/players/${player.id}`, {
       method: "DELETE",
     });
     expect(res.status).toBe(409);
-    expect((await json<{ error: string }>(res)).error).toBe(
-      "Cannot delete a claimed player",
-    );
+    expect((await errorOf(res)).error).toBe("Cannot delete a claimed player");
   });
 });
 
@@ -214,12 +227,13 @@ describe("claiming players", () => {
   });
 
   async function createPlayer(name: string) {
-    return json<PlayerResponse>(
+    return json(
       await request("/api/players", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name }),
       }),
+      playerSchema,
     );
   }
 
@@ -249,13 +263,14 @@ describe("claiming players", () => {
       headers: { "X-Device-Token": deviceToken },
     });
     expect(res.status).toBe(200);
-    expect(await json<PlayerResponse>(res)).toMatchObject({
+    expect(await json(res, playerSchema)).toMatchObject({
       id: player.id,
       claimedByUserId: userId,
     });
 
-    const { players } = await json<{ players: PlayerResponse[] }>(
+    const { players } = await json(
       await request("/api/players"),
+      playerListResponseSchema,
     );
     expect(players[0].claimedByUserId).toBe(userId);
   });
@@ -303,8 +318,9 @@ describe("claiming players", () => {
       headers: { "X-Device-Token": deviceToken },
     });
 
-    const { players } = await json<{ players: PlayerResponse[] }>(
+    const { players } = await json(
       await request("/api/players?unclaimed=true"),
+      playerListResponseSchema,
     );
     expect(players.map((p) => p.id)).toEqual([unclaimed.id]);
   });
@@ -336,7 +352,7 @@ describe("claiming players", () => {
       body: JSON.stringify({ name: "Ally" }),
     });
     expect(res.status).toBe(200);
-    expect((await json<PlayerResponse>(res)).name).toBe("Ally");
+    expect((await json(res, playerSchema)).name).toBe("Ally");
   });
 
   it("403s renaming a claimed player as a different user", async () => {
@@ -357,7 +373,7 @@ describe("claiming players", () => {
       body: JSON.stringify({ name: "Ally" }),
     });
     expect(res.status).toBe(403);
-    expect((await json<{ error: string }>(res)).error).toBe(
+    expect((await errorOf(res)).error).toBe(
       "Only the player who claimed this profile can edit it",
     );
   });
@@ -408,15 +424,13 @@ describe("player stats", () => {
     strokes: number,
     options?: { counting?: boolean },
   ) {
-    const round = await json<{
-      id: number;
-      scores: Array<{ id: number }>;
-    }>(
+    const round = await json(
       await request("/api/rounds", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ courseId, layoutId, playerIds: [playerId] }),
       }),
+      roundDetailSchema,
     );
     await request(`/api/hole-scores/${round.scores[0].id}`, {
       method: "PATCH",
@@ -435,27 +449,30 @@ describe("player stats", () => {
 
   it("lists the layouts a player has completed rounds on", async () => {
     const { courseId, layoutId } = await setUpCourseWithOneHole();
-    const player = await json<{ id: number }>(
+    const player = await json(
       await request("/api/players", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Alice" }),
       }),
+      playerSchema,
     );
 
     expect(
       (
-        await json<{ layouts: unknown[] }>(
+        await json(
           await request(`/api/players/${player.id}/layouts`),
+          playedLayoutsResponseSchema,
         )
       ).layouts,
     ).toHaveLength(0);
 
     await playRound(courseId, layoutId, player.id, 4);
 
-    const { layouts } = await json<{
-      layouts: Array<{ courseName: string; layoutName: string }>;
-    }>(await request(`/api/players/${player.id}/layouts`));
+    const { layouts } = await json(
+      await request(`/api/players/${player.id}/layouts`),
+      playedLayoutsResponseSchema,
+    );
     expect(layouts).toEqual([
       { courseId, courseName: "Maple Hill", layoutId, layoutName: "Blue" },
     ]);
@@ -463,12 +480,13 @@ describe("player stats", () => {
 
   it("aggregates hole stats across completed rounds only", async () => {
     const { courseId, layoutId } = await setUpCourseWithOneHole();
-    const player = await json<{ id: number }>(
+    const player = await json(
       await request("/api/players", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Alice" }),
       }),
+      playerSchema,
     );
 
     await playRound(courseId, layoutId, player.id, 4);
@@ -480,15 +498,10 @@ describe("player stats", () => {
       body: JSON.stringify({ courseId, layoutId, playerIds: [player.id] }),
     });
 
-    const { holes } = await json<{
-      holes: Array<{
-        number: number;
-        timesPlayed: number;
-        avgStrokes: number;
-        bestStrokes: number;
-        worstStrokes: number;
-      }>;
-    }>(await request(`/api/players/${player.id}/stats?layoutId=${layoutId}`));
+    const { holes } = await json(
+      await request(`/api/players/${player.id}/stats?layoutId=${layoutId}`),
+      holeStatsResponseSchema,
+    );
 
     expect(holes).toEqual([
       {
@@ -506,34 +519,38 @@ describe("player stats", () => {
 
   it("excludes non-counting rounds from both stats and the layouts list", async () => {
     const { courseId, layoutId } = await setUpCourseWithOneHole();
-    const player = await json<{ id: number }>(
+    const player = await json(
       await request("/api/players", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Alice" }),
       }),
+      playerSchema,
     );
 
     await playRound(courseId, layoutId, player.id, 4, { counting: false });
 
-    const { layouts } = await json<{ layouts: unknown[] }>(
+    const { layouts } = await json(
       await request(`/api/players/${player.id}/layouts`),
+      playedLayoutsResponseSchema,
     );
     expect(layouts).toHaveLength(0);
 
-    const { holes } = await json<{ holes: unknown[] }>(
+    const { holes } = await json(
       await request(`/api/players/${player.id}/stats?layoutId=${layoutId}`),
+      holeStatsResponseSchema,
     );
     expect(holes).toHaveLength(0);
   });
 
   it("returns the 3 most recently played courses, most recent first", async () => {
-    const player = await json<{ id: number }>(
+    const player = await json(
       await request("/api/players", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Alice" }),
       }),
+      playerSchema,
     );
 
     const courseA = await setUpCourseWithOneHole();
@@ -559,9 +576,10 @@ describe("player stats", () => {
     await playRound(courseC.courseId, courseC.layoutId, player.id, 3);
     await playRound(courseD.courseId, courseD.layoutId, player.id, 3);
 
-    const { recentCourses } = await json<{
-      recentCourses: Array<{ courseName: string; layoutName: string }>;
-    }>(await request(`/api/players/${player.id}/recent-courses`));
+    const { recentCourses } = await json(
+      await request(`/api/players/${player.id}/recent-courses`),
+      recentCoursesResponseSchema,
+    );
 
     expect(recentCourses).toEqual([
       {
@@ -587,31 +605,34 @@ describe("player stats", () => {
 
   it("dedupes repeated rounds on the same course/layout into one recent entry", async () => {
     const { courseId, layoutId } = await setUpCourseWithOneHole();
-    const player = await json<{ id: number }>(
+    const player = await json(
       await request("/api/players", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Alice" }),
       }),
+      playerSchema,
     );
 
     await playRound(courseId, layoutId, player.id, 3);
     await playRound(courseId, layoutId, player.id, 4);
 
-    const { recentCourses } = await json<{ recentCourses: unknown[] }>(
+    const { recentCourses } = await json(
       await request(`/api/players/${player.id}/recent-courses`),
+      recentCoursesResponseSchema,
     );
     expect(recentCourses).toHaveLength(1);
   });
 
   it("includes in-progress and non-counting rounds in recent courses", async () => {
     const { courseId, layoutId } = await setUpCourseWithOneHole();
-    const player = await json<{ id: number }>(
+    const player = await json(
       await request("/api/players", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Alice" }),
       }),
+      playerSchema,
     );
 
     // Neither completed nor marked counting — still a course the player
@@ -622,23 +643,26 @@ describe("player stats", () => {
       body: JSON.stringify({ courseId, layoutId, playerIds: [player.id] }),
     });
 
-    const { recentCourses } = await json<{ recentCourses: unknown[] }>(
+    const { recentCourses } = await json(
       await request(`/api/players/${player.id}/recent-courses`),
+      recentCoursesResponseSchema,
     );
     expect(recentCourses).toHaveLength(1);
   });
 
   it("returns an empty list for a player with no rounds", async () => {
-    const player = await json<{ id: number }>(
+    const player = await json(
       await request("/api/players", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Alice" }),
       }),
+      playerSchema,
     );
 
-    const { recentCourses } = await json<{ recentCourses: unknown[] }>(
+    const { recentCourses } = await json(
       await request(`/api/players/${player.id}/recent-courses`),
+      recentCoursesResponseSchema,
     );
     expect(recentCourses).toEqual([]);
   });
@@ -654,12 +678,13 @@ describe("player stats", () => {
   });
 
   it("requires a layoutId for stats", async () => {
-    const player = await json<{ id: number }>(
+    const player = await json(
       await request("/api/players", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Alice" }),
       }),
+      playerSchema,
     );
     const res = await request(`/api/players/${player.id}/stats`);
     expect(res.status).toBe(400);

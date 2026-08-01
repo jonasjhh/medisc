@@ -2,6 +2,13 @@ import { Hono } from "hono";
 import type { AppEnv } from "../types";
 import { createPlayerSchema, updatePlayerSchema } from "../schemas";
 import { parseIntParam } from "../params";
+import {
+  holeStatsResponseSchema,
+  playedLayoutsResponseSchema,
+  playerListResponseSchema,
+  playerSchema,
+  recentCoursesResponseSchema,
+} from "../../shared/contracts/players";
 
 interface PlayerRow {
   id: number;
@@ -43,13 +50,13 @@ async function countPlayerRounds(db: D1Database, playerId: number) {
 }
 
 function serializePlayer(row: PlayerRow, roundCount: number) {
-  return {
+  return playerSchema.parse({
     id: row.id,
     name: row.name,
     createdAt: row.created_at,
     roundCount,
     claimedByUserId: row.claimed_by_user_id,
-  };
+  });
 }
 
 export const playersRoute = new Hono<AppEnv>();
@@ -83,15 +90,11 @@ playersRoute.get("/", async (c) => {
      ORDER BY players.name`,
   ).all<PlayerListRow>();
 
-  return c.json({
-    players: results.map((row) => ({
-      id: row.id,
-      name: row.name,
-      createdAt: row.created_at,
-      roundCount: row.round_count,
-      claimedByUserId: row.claimed_by_user_id,
-    })),
-  });
+  return c.json(
+    playerListResponseSchema.parse({
+      players: results.map((row) => serializePlayer(row, row.round_count)),
+    }),
+  );
 });
 
 playersRoute.patch("/:playerId", async (c) => {
@@ -199,14 +202,16 @@ playersRoute.get("/:playerId/layouts", async (c) => {
     .bind(playerId)
     .all<PlayedLayoutRow>();
 
-  return c.json({
-    layouts: results.map((row) => ({
-      courseId: row.course_id,
-      courseName: row.course_name,
-      layoutId: row.layout_id,
-      layoutName: row.layout_name,
-    })),
-  });
+  return c.json(
+    playedLayoutsResponseSchema.parse({
+      layouts: results.map((row) => ({
+        courseId: row.course_id,
+        courseName: row.course_name,
+        layoutId: row.layout_id,
+        layoutName: row.layout_name,
+      })),
+    }),
+  );
 });
 
 const RECENT_COURSES_LIMIT = 3;
@@ -243,14 +248,16 @@ playersRoute.get("/:playerId/recent-courses", async (c) => {
     .bind(playerId, RECENT_COURSES_LIMIT)
     .all<PlayedLayoutRow & { last_round_id: number }>();
 
-  return c.json({
-    recentCourses: results.map((row) => ({
-      courseId: row.course_id,
-      courseName: row.course_name,
-      layoutId: row.layout_id,
-      layoutName: row.layout_name,
-    })),
-  });
+  return c.json(
+    recentCoursesResponseSchema.parse({
+      recentCourses: results.map((row) => ({
+        courseId: row.course_id,
+        courseName: row.course_name,
+        layoutId: row.layout_id,
+        layoutName: row.layout_name,
+      })),
+    }),
+  );
 });
 
 playersRoute.get("/:playerId/stats", async (c) => {
@@ -291,18 +298,20 @@ playersRoute.get("/:playerId/stats", async (c) => {
     .bind(playerId, layoutId)
     .all<HoleStatRow>();
 
-  return c.json({
-    holes: results.map((row) => ({
-      holeId: row.hole_id,
-      number: row.number,
-      par: row.par,
-      timesPlayed: row.times_played,
-      avgStrokes: row.avg_strokes,
-      bestStrokes: row.best_strokes,
-      worstStrokes: row.worst_strokes,
-      avgPenalties: row.avg_penalties,
-    })),
-  });
+  return c.json(
+    holeStatsResponseSchema.parse({
+      holes: results.map((row) => ({
+        holeId: row.hole_id,
+        number: row.number,
+        par: row.par,
+        timesPlayed: row.times_played,
+        avgStrokes: row.avg_strokes,
+        bestStrokes: row.best_strokes,
+        worstStrokes: row.worst_strokes,
+        avgPenalties: row.avg_penalties,
+      })),
+    }),
+  );
 });
 
 playersRoute.post("/:playerId/claim", async (c) => {
