@@ -67,14 +67,7 @@ describe("RoundsListPage", () => {
     expect(await screen.findByText("Maple Hill — Blue")).toBeInTheDocument();
     expect(screen.getByText("Alice, Bob")).toBeInTheDocument();
     expect(screen.getByText("In progress")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        new Date("2026-01-15T14:30:00Z").toLocaleString(undefined, {
-          dateStyle: "medium",
-          timeStyle: "short",
-        }),
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("15 Jan 2026 14:30")).toBeInTheDocument();
   });
 
   it("shows a Completed chip for finished rounds", async () => {
