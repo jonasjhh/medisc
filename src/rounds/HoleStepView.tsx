@@ -90,7 +90,7 @@ export function HoleStepView({
               </ToggleButtonGroup>
             )}
 
-            <Stack direction="row" spacing={4}>
+            <Stack direction="row" spacing={6}>
               <ScoreAdjuster
                 label="Strokes"
                 value={score.strokes}
