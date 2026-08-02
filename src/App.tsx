@@ -32,6 +32,7 @@ import { RoundsListPage } from "./rounds/RoundsListPage";
 import { PlayersListPage } from "./players/PlayersListPage";
 import { PlayerStatsPage } from "./players/PlayerStatsPage";
 import { InstallPrompt } from "./app/InstallPrompt";
+import { OfflineBanner } from "./app/OfflineBanner";
 import { UpdatePrompt } from "./app/UpdatePrompt";
 import { useThemeMode } from "./app/useThemeMode";
 import type { ThemeModePreference } from "./app/useThemeMode";
@@ -204,6 +205,7 @@ export function App() {
       basename={import.meta.env.BASE_URL}
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
+      <OfflineBanner />
       <UpdatePrompt />
       <InstallPrompt />
       <IdentityModal />
