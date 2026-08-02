@@ -15,6 +15,7 @@ function aCourseSummary(overrides: Partial<CourseSummary> = {}): CourseSummary {
     name: "Maple Hill",
     createdAt: "",
     layoutCount: 1,
+    roundCount: 0,
     ...overrides,
   });
 }

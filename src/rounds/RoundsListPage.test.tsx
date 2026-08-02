@@ -26,7 +26,15 @@ describe("RoundsListPage", () => {
       ],
     });
     vi.mocked(coursesApi.listCourses).mockResolvedValue({
-      courses: [{ id: 1, name: "Maple Hill", createdAt: "", layoutCount: 1 }],
+      courses: [
+        {
+          id: 1,
+          name: "Maple Hill",
+          createdAt: "",
+          layoutCount: 1,
+          roundCount: 0,
+        },
+      ],
     });
   });
 

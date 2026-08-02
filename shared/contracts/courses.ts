@@ -5,6 +5,7 @@ export const courseSummarySchema = z.object({
   name: z.string(),
   createdAt: z.string(),
   layoutCount: z.number(),
+  roundCount: z.number(),
 });
 export type CourseSummary = z.infer<typeof courseSummarySchema>;
 

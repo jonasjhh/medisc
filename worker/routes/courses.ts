@@ -14,6 +14,7 @@ interface CourseRow {
 
 interface CourseListRow extends CourseRow {
   layout_count: number;
+  round_count: number;
 }
 
 interface LayoutRow {
@@ -35,9 +36,11 @@ export const coursesRoute = new Hono<AppEnv>();
 coursesRoute.get("/", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT courses.id, courses.name, courses.created_at,
-            COUNT(layouts.id) AS layout_count
+            COUNT(DISTINCT layouts.id) AS layout_count,
+            COUNT(DISTINCT rounds.id) AS round_count
      FROM courses
      LEFT JOIN layouts ON layouts.course_id = courses.id
+     LEFT JOIN rounds ON rounds.course_id = courses.id
      GROUP BY courses.id
      ORDER BY courses.created_at DESC`,
   ).all<CourseListRow>();
@@ -49,6 +52,7 @@ coursesRoute.get("/", async (c) => {
         name: row.name,
         createdAt: row.created_at,
         layoutCount: row.layout_count,
+        roundCount: row.round_count,
       })),
     }),
   );

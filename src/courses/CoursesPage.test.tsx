@@ -9,7 +9,15 @@ vi.mock("./api");
 describe("CoursesPage", () => {
   beforeEach(() => {
     vi.mocked(api.listCourses).mockResolvedValue({
-      courses: [{ id: 1, name: "Maple Hill", createdAt: "", layoutCount: 2 }],
+      courses: [
+        {
+          id: 1,
+          name: "Maple Hill",
+          createdAt: "",
+          layoutCount: 2,
+          roundCount: 5,
+        },
+      ],
     });
   });
 
@@ -23,7 +31,32 @@ describe("CoursesPage", () => {
     );
 
     expect(await screen.findByText("Maple Hill")).toBeInTheDocument();
-    expect(screen.getByText("2 layouts")).toBeInTheDocument();
+    expect(screen.getByText("2 layouts · 5 rounds")).toBeInTheDocument();
+  });
+
+  it("uses singular phrasing for one layout and one round", async () => {
+    vi.mocked(api.listCourses).mockResolvedValue({
+      courses: [
+        {
+          id: 1,
+          name: "Pine Valley",
+          createdAt: "",
+          layoutCount: 1,
+          roundCount: 1,
+        },
+      ],
+    });
+
+    render(
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <CoursesPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Pine Valley")).toBeInTheDocument();
+    expect(screen.getByText("1 layout · 1 round")).toBeInTheDocument();
   });
 
   it("shows an empty state when there are no courses", async () => {

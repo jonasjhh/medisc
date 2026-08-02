@@ -56,7 +56,7 @@ export function CoursesPage() {
             >
               <ListItemText
                 primary={course.name}
-                secondary={`${course.layoutCount} layout${course.layoutCount === 1 ? "" : "s"}`}
+                secondary={`${course.layoutCount} layout${course.layoutCount === 1 ? "" : "s"} · ${course.roundCount} round${course.roundCount === 1 ? "" : "s"}`}
               />
             </ListItemButton>
           ))}

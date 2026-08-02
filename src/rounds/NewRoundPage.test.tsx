@@ -29,7 +29,15 @@ describe("NewRoundPage", () => {
       ],
     });
     vi.mocked(coursesApi.listCourses).mockResolvedValue({
-      courses: [{ id: 1, name: "Maple Hill", createdAt: "", layoutCount: 1 }],
+      courses: [
+        {
+          id: 1,
+          name: "Maple Hill",
+          createdAt: "",
+          layoutCount: 1,
+          roundCount: 0,
+        },
+      ],
     });
     vi.mocked(coursesApi.getCourse).mockResolvedValue({
       id: 1,
@@ -266,7 +274,15 @@ describe("NewRoundPage", () => {
   it("selects a recent course's specific layout in one click", async () => {
     mockClaimedPlayer();
     vi.mocked(coursesApi.listCourses).mockResolvedValue({
-      courses: [{ id: 1, name: "Maple Hill", createdAt: "", layoutCount: 2 }],
+      courses: [
+        {
+          id: 1,
+          name: "Maple Hill",
+          createdAt: "",
+          layoutCount: 2,
+          roundCount: 0,
+        },
+      ],
     });
     vi.mocked(coursesApi.getCourse).mockResolvedValue({
       id: 1,

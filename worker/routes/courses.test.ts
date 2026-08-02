@@ -17,6 +17,9 @@ async function json<S extends ZodTypeAny>(
 
 describe("courses API", () => {
   beforeEach(async () => {
+    await env.DB.exec("DELETE FROM hole_scores");
+    await env.DB.exec("DELETE FROM round_players");
+    await env.DB.exec("DELETE FROM rounds");
     await env.DB.exec("DELETE FROM holes");
     await env.DB.exec("DELETE FROM layouts");
     await env.DB.exec("DELETE FROM courses");
@@ -33,7 +36,35 @@ describe("courses API", () => {
     expect(res.status).toBe(200);
     const { courses } = await json(res, courseListResponseSchema);
     expect(courses).toEqual([
-      expect.objectContaining({ name: "Maple Hill", layoutCount: 1 }),
+      expect.objectContaining({
+        name: "Maple Hill",
+        layoutCount: 1,
+        roundCount: 0,
+      }),
+    ]);
+  });
+
+  it("lists courses with the number of rounds played there", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [],
+    });
+    await env.DB.prepare(
+      "INSERT INTO rounds (course_id, layout_id) VALUES (?, ?)",
+    )
+      .bind(courseId, layoutId)
+      .run();
+    await env.DB.prepare(
+      "INSERT INTO rounds (course_id, layout_id) VALUES (?, ?)",
+    )
+      .bind(courseId, layoutId)
+      .run();
+
+    const res = await app.request("/api/courses", {}, env);
+    const { courses } = await json(res, courseListResponseSchema);
+    expect(courses).toEqual([
+      expect.objectContaining({ name: "Maple Hill", roundCount: 2 }),
     ]);
   });
 
