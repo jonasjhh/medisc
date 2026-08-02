@@ -8,6 +8,8 @@ import {
   playerListResponseSchema,
   playerSchema,
   recentCoursesResponseSchema,
+  scoreDistributionResponseSchema,
+  type ScoreDistribution,
 } from "../../shared/contracts/players";
 
 interface PlayerRow {
@@ -37,6 +39,11 @@ interface HoleStatRow {
   best_strokes: number;
   worst_strokes: number;
   avg_penalties: number;
+}
+
+interface ScoreBucketRow {
+  bucket: keyof ScoreDistribution;
+  count: number;
 }
 
 async function countPlayerRounds(db: D1Database, playerId: number) {
@@ -312,6 +319,60 @@ playersRoute.get("/:playerId/stats", async (c) => {
       })),
     }),
   );
+});
+
+playersRoute.get("/:playerId/score-distribution", async (c) => {
+  const playerId = parseIntParam(c.req.param("playerId"));
+  if (playerId === null) {
+    return c.json({ error: "Invalid player id" }, 400);
+  }
+
+  const player = await c.env.DB.prepare("SELECT id FROM players WHERE id = ?")
+    .bind(playerId)
+    .first();
+  if (!player) {
+    return c.json({ error: "Player not found" }, 404);
+  }
+
+  // Buckets mirror src/rounds/scoreColor.ts's scoreOutcome(): an ace takes
+  // priority over how far under par it is, then it's purely relative to par.
+  const { results } = await c.env.DB.prepare(
+    `SELECT
+       CASE
+         WHEN hole_scores.strokes = 1 THEN 'ace'
+         WHEN hole_scores.strokes <= holes.par - 2 THEN 'eagle'
+         WHEN hole_scores.strokes = holes.par - 1 THEN 'birdie'
+         WHEN hole_scores.strokes = holes.par THEN 'par'
+         WHEN hole_scores.strokes = holes.par + 1 THEN 'bogey'
+         WHEN hole_scores.strokes = holes.par + 2 THEN 'doubleBogey'
+         ELSE 'worse'
+       END AS bucket,
+       COUNT(*) AS count
+     FROM hole_scores
+     JOIN rounds ON rounds.id = hole_scores.round_id
+     JOIN holes ON holes.id = hole_scores.hole_id
+     WHERE hole_scores.player_id = ?
+       AND rounds.completed_at IS NOT NULL
+       AND rounds.counting = 1
+     GROUP BY bucket`,
+  )
+    .bind(playerId)
+    .all<ScoreBucketRow>();
+
+  const distribution: ScoreDistribution = {
+    ace: 0,
+    eagle: 0,
+    birdie: 0,
+    par: 0,
+    bogey: 0,
+    doubleBogey: 0,
+    worse: 0,
+  };
+  for (const row of results) {
+    distribution[row.bucket] = row.count;
+  }
+
+  return c.json(scoreDistributionResponseSchema.parse({ distribution }));
 });
 
 playersRoute.post("/:playerId/claim", async (c) => {

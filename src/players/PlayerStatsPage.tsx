@@ -17,9 +17,15 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
-import { getPlayerLayouts, getPlayerStats, listPlayers } from "./api";
-import type { HoleStat, Player, PlayedLayout } from "./api";
+import {
+  getPlayerLayouts,
+  getPlayerStats,
+  getScoreDistribution,
+  listPlayers,
+} from "./api";
+import type { HoleStat, Player, PlayedLayout, ScoreDistribution } from "./api";
 import { ClaimedStatusChip } from "./ClaimedStatusChip";
+import { ScoreDistributionChart } from "./ScoreDistributionChart";
 import { useIdentity } from "../identity/useIdentity";
 import type { Status } from "../shared/status";
 
@@ -32,19 +38,24 @@ export function PlayerStatsPage() {
   const [layouts, setLayouts] = useState<PlayedLayout[]>([]);
   const [layoutId, setLayoutId] = useState<number | "">("");
   const [holes, setHoles] = useState<HoleStat[]>([]);
+  const [distribution, setDistribution] = useState<ScoreDistribution | null>(
+    null,
+  );
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
       try {
-        const [{ players }, { layouts }] = await Promise.all([
+        const [{ players }, { layouts }, { distribution }] = await Promise.all([
           listPlayers(),
           getPlayerLayouts(id),
+          getScoreDistribution(id),
         ]);
         setPlayer(players.find((candidate) => candidate.id === id) ?? null);
         setLayouts(layouts);
         setLayoutId(layouts.length > 0 ? layouts[0].layoutId : "");
+        setDistribution(distribution);
         setStatus("ready");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load player");
@@ -93,6 +104,16 @@ export function PlayerStatsPage() {
               />
             )}
           </Stack>
+
+          {distribution &&
+            Object.values(distribution).some((count) => count > 0) && (
+              <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+                <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                  Throw distribution
+                </Typography>
+                <ScoreDistributionChart distribution={distribution} />
+              </Paper>
+            )}
 
           {layouts.length === 0 ? (
             <Typography color="text.secondary">

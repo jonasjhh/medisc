@@ -9,6 +9,7 @@ import {
   playerSchema,
   recentCoursesResponseSchema,
   holeStatsResponseSchema,
+  scoreDistributionResponseSchema,
 } from "../../shared/contracts/players";
 import { roundDetailSchema } from "../../shared/contracts/rounds";
 
@@ -688,5 +689,220 @@ describe("player stats", () => {
     );
     const res = await request(`/api/players/${player.id}/stats`);
     expect(res.status).toBe(400);
+  });
+});
+
+describe("player score distribution", () => {
+  beforeEach(async () => {
+    await env.DB.exec("DELETE FROM hole_scores");
+    await env.DB.exec("DELETE FROM round_players");
+    await env.DB.exec("DELETE FROM rounds");
+    await env.DB.exec("DELETE FROM holes");
+    await env.DB.exec("DELETE FROM layouts");
+    await env.DB.exec("DELETE FROM courses");
+    await env.DB.exec("DELETE FROM device_link_codes");
+    await env.DB.exec("DELETE FROM device_tokens");
+    await env.DB.exec("DELETE FROM players");
+    await env.DB.exec("DELETE FROM users");
+  });
+
+  async function createPlayer(name: string) {
+    return json(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      }),
+      playerSchema,
+    );
+  }
+
+  // Plays a round setting each hole's strokes by hole number, then completes
+  // it. Holes need varying par so every bucket (especially eagle, which is
+  // unreachable on a par-3) can be exercised.
+  async function playRoundWithStrokes(
+    courseId: number,
+    layoutId: number,
+    playerId: number,
+    strokesByHoleNumber: Record<number, number>,
+    options?: { counting?: boolean; complete?: boolean },
+  ) {
+    const round = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [playerId] }),
+      }),
+      roundDetailSchema,
+    );
+    for (const hole of round.holes) {
+      const strokes = strokesByHoleNumber[hole.number];
+      if (strokes === undefined) continue;
+      const score = round.scores.find((s) => s.holeId === hole.id)!;
+      await request(`/api/hole-scores/${score.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ strokes }),
+      });
+    }
+    if (options?.counting === false) {
+      await request(`/api/rounds/${round.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ counting: false }),
+      });
+    }
+    if (options?.complete !== false) {
+      await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
+    }
+    return round;
+  }
+
+  it("buckets every counting throw across all of a player's rounds", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [
+        { number: 1, par: 5 }, // eagle: strokes = 3
+        { number: 2, par: 3 }, // ace: strokes = 1
+        { number: 3, par: 3 }, // birdie: strokes = 2
+        { number: 4, par: 3 }, // par: strokes = 3
+        { number: 5, par: 3 }, // bogey: strokes = 4
+        { number: 6, par: 3 }, // double bogey: strokes = 5
+        { number: 7, par: 3 }, // worse: strokes = 6
+      ],
+    });
+    const player = await createPlayer("Alice");
+
+    await playRoundWithStrokes(courseId, layoutId, player.id, {
+      1: 3,
+      2: 1,
+      3: 2,
+      4: 3,
+      5: 4,
+      6: 5,
+      7: 6,
+    });
+
+    const { distribution } = await json(
+      await request(`/api/players/${player.id}/score-distribution`),
+      scoreDistributionResponseSchema,
+    );
+    expect(distribution).toEqual({
+      ace: 1,
+      eagle: 1,
+      birdie: 1,
+      par: 1,
+      bogey: 1,
+      doubleBogey: 1,
+      worse: 1,
+    });
+  });
+
+  it("an ace takes priority over eagle even on a hole where strokes = 1 would also qualify as eagle", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [{ number: 1, par: 5 }],
+    });
+    const player = await createPlayer("Alice");
+
+    await playRoundWithStrokes(courseId, layoutId, player.id, { 1: 1 });
+
+    const { distribution } = await json(
+      await request(`/api/players/${player.id}/score-distribution`),
+      scoreDistributionResponseSchema,
+    );
+    expect(distribution.ace).toBe(1);
+    expect(distribution.eagle).toBe(0);
+  });
+
+  it("aggregates across every layout the player has played, not just one", async () => {
+    const courseA = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const courseB = await seedCourse(env, {
+      courseName: "Pine Ridge",
+      layoutName: "Red",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const player = await createPlayer("Alice");
+
+    await playRoundWithStrokes(courseA.courseId, courseA.layoutId, player.id, {
+      1: 3,
+    });
+    await playRoundWithStrokes(courseB.courseId, courseB.layoutId, player.id, {
+      1: 4,
+    });
+
+    const { distribution } = await json(
+      await request(`/api/players/${player.id}/score-distribution`),
+      scoreDistributionResponseSchema,
+    );
+    expect(distribution.par).toBe(1);
+    expect(distribution.bogey).toBe(1);
+  });
+
+  it("excludes in-progress and non-counting rounds", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const player = await createPlayer("Alice");
+
+    await playRoundWithStrokes(
+      courseId,
+      layoutId,
+      player.id,
+      { 1: 4 },
+      { counting: false },
+    );
+    await playRoundWithStrokes(
+      courseId,
+      layoutId,
+      player.id,
+      { 1: 5 },
+      { complete: false },
+    );
+
+    const { distribution } = await json(
+      await request(`/api/players/${player.id}/score-distribution`),
+      scoreDistributionResponseSchema,
+    );
+    expect(distribution).toEqual({
+      ace: 0,
+      eagle: 0,
+      birdie: 0,
+      par: 0,
+      bogey: 0,
+      doubleBogey: 0,
+      worse: 0,
+    });
+  });
+
+  it("returns a zero-filled distribution for a player with no rounds", async () => {
+    const player = await createPlayer("Alice");
+
+    const { distribution } = await json(
+      await request(`/api/players/${player.id}/score-distribution`),
+      scoreDistributionResponseSchema,
+    );
+    expect(distribution).toEqual({
+      ace: 0,
+      eagle: 0,
+      birdie: 0,
+      par: 0,
+      bogey: 0,
+      doubleBogey: 0,
+      worse: 0,
+    });
+  });
+
+  it("404s for a player that doesn't exist", async () => {
+    const res = await request("/api/players/999/score-distribution");
+    expect(res.status).toBe(404);
   });
 });

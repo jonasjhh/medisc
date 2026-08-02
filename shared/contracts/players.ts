@@ -48,3 +48,23 @@ export const holeStatsResponseSchema = z.object({
   holes: z.array(holeStatSchema),
 });
 export type HoleStatsResponse = z.infer<typeof holeStatsResponseSchema>;
+
+// Bucket names match src/rounds/scoreColor.ts's ScoreOutcome so the two stay
+// interchangeable in the UI without a translation layer.
+export const scoreDistributionSchema = z.object({
+  ace: z.number(),
+  eagle: z.number(),
+  birdie: z.number(),
+  par: z.number(),
+  bogey: z.number(),
+  doubleBogey: z.number(),
+  worse: z.number(),
+});
+export type ScoreDistribution = z.infer<typeof scoreDistributionSchema>;
+
+export const scoreDistributionResponseSchema = z.object({
+  distribution: scoreDistributionSchema,
+});
+export type ScoreDistributionResponse = z.infer<
+  typeof scoreDistributionResponseSchema
+>;

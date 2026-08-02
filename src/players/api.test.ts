@@ -6,6 +6,7 @@ import {
   getPlayerLayouts,
   getPlayerStats,
   getRecentCourses,
+  getScoreDistribution,
   listPlayers,
   updatePlayer,
 } from "./api";
@@ -13,11 +14,13 @@ import {
   holeStatSchema,
   playedLayoutSchema,
   playerSchema,
+  scoreDistributionSchema,
 } from "../../shared/contracts/players";
 import type {
   HoleStat,
   PlayedLayout,
   Player,
+  ScoreDistribution,
 } from "../../shared/contracts/players";
 
 function aPlayer(overrides: Partial<Player> = {}): Player {
@@ -51,6 +54,21 @@ function aHoleStat(overrides: Partial<HoleStat> = {}): HoleStat {
     bestStrokes: 3,
     worstStrokes: 4,
     avgPenalties: 0,
+    ...overrides,
+  });
+}
+
+function aScoreDistribution(
+  overrides: Partial<ScoreDistribution> = {},
+): ScoreDistribution {
+  return scoreDistributionSchema.parse({
+    ace: 0,
+    eagle: 0,
+    birdie: 0,
+    par: 0,
+    bogey: 0,
+    doubleBogey: 0,
+    worse: 0,
     ...overrides,
   });
 }
@@ -151,6 +169,18 @@ describe("players api", () => {
     expect(holes).toHaveLength(1);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/players/1/stats?layoutId=2",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+  });
+
+  it("gets a player's overall score distribution", async () => {
+    const fetchMock = mockFetchOnce({
+      distribution: aScoreDistribution({ birdie: 3, par: 10 }),
+    });
+    const { distribution } = await getScoreDistribution(1);
+    expect(distribution).toEqual(aScoreDistribution({ birdie: 3, par: 10 }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/players/1/score-distribution",
       expect.objectContaining({ headers: expect.any(Headers) }),
     );
   });

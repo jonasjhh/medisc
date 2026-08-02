@@ -43,6 +43,17 @@ describe("PlayerStatsPage", () => {
         },
       ],
     });
+    vi.mocked(playersApi.getScoreDistribution).mockResolvedValue({
+      distribution: {
+        ace: 0,
+        eagle: 0,
+        birdie: 0,
+        par: 0,
+        bogey: 0,
+        doubleBogey: 0,
+        worse: 0,
+      },
+    });
   });
 
   it("shows an empty state when the player has no completed rounds", async () => {
@@ -54,6 +65,39 @@ describe("PlayerStatsPage", () => {
     expect(
       await screen.findByText(/no completed rounds yet/i),
     ).toBeInTheDocument();
+  });
+
+  it("hides the throw distribution section when no counting throws exist", async () => {
+    vi.mocked(playersApi.getPlayerLayouts).mockResolvedValue({ layouts: [] });
+
+    renderPage();
+
+    await screen.findByText("Alice");
+    expect(screen.queryByText("Throw distribution")).not.toBeInTheDocument();
+  });
+
+  it("shows the throw distribution section with counts by outcome", async () => {
+    vi.mocked(playersApi.getPlayerLayouts).mockResolvedValue({ layouts: [] });
+    vi.mocked(playersApi.getScoreDistribution).mockResolvedValue({
+      distribution: {
+        ace: 1,
+        eagle: 0,
+        birdie: 3,
+        par: 10,
+        bogey: 4,
+        doubleBogey: 1,
+        worse: 0,
+      },
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Throw distribution")).toBeInTheDocument();
+    expect(screen.getByText("19 counting throws recorded")).toBeInTheDocument();
+    expect(screen.getByText("Ace")).toBeInTheDocument();
+    expect(screen.getByText("Birdie")).toBeInTheDocument();
+    expect(screen.getByText("Double bogey")).toBeInTheDocument();
+    expect(screen.getByText("Triple bogey+")).toBeInTheDocument();
   });
 
   it("shows a Guest pill for an unclaimed player", async () => {

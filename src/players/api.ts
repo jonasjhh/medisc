@@ -5,6 +5,7 @@ import {
   playerListResponseSchema,
   playerSchema,
   recentCoursesResponseSchema,
+  scoreDistributionResponseSchema,
 } from "../../shared/contracts/players";
 import type {
   HoleStat,
@@ -14,6 +15,8 @@ import type {
   Player,
   PlayerListResponse,
   RecentCoursesResponse,
+  ScoreDistribution,
+  ScoreDistributionResponse,
 } from "../../shared/contracts/players";
 
 export type {
@@ -24,6 +27,8 @@ export type {
   Player,
   PlayerListResponse,
   RecentCoursesResponse,
+  ScoreDistribution,
+  ScoreDistributionResponse,
 };
 
 export async function listPlayers(options?: {
@@ -81,5 +86,13 @@ export async function getPlayerStats(
 ): Promise<HoleStatsResponse> {
   return holeStatsResponseSchema.parse(
     await request(`/api/players/${playerId}/stats?layoutId=${layoutId}`),
+  );
+}
+
+export async function getScoreDistribution(
+  playerId: number,
+): Promise<ScoreDistributionResponse> {
+  return scoreDistributionResponseSchema.parse(
+    await request(`/api/players/${playerId}/score-distribution`),
   );
 }
