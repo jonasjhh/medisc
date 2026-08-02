@@ -43,7 +43,7 @@ describe("RoundsListPage", () => {
       rounds: [
         {
           id: 1,
-          createdAt: "",
+          createdAt: "2026-01-15 14:30:00",
           completedAt: null,
           counting: true,
           courseName: "Maple Hill",
@@ -67,6 +67,14 @@ describe("RoundsListPage", () => {
     expect(await screen.findByText("Maple Hill — Blue")).toBeInTheDocument();
     expect(screen.getByText("Alice, Bob")).toBeInTheDocument();
     expect(screen.getByText("In progress")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        new Date("2026-01-15T14:30:00Z").toLocaleString(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }),
+      ),
+    ).toBeInTheDocument();
   });
 
   it("shows a Completed chip for finished rounds", async () => {
@@ -74,7 +82,7 @@ describe("RoundsListPage", () => {
       rounds: [
         {
           id: 1,
-          createdAt: "",
+          createdAt: "2026-01-01 12:00:00",
           completedAt: "2026-01-01 12:00:00",
           counting: true,
           courseName: "Maple Hill",
@@ -103,7 +111,7 @@ describe("RoundsListPage", () => {
       rounds: [
         {
           id: 1,
-          createdAt: "",
+          createdAt: "2026-01-01 12:00:00",
           completedAt: null,
           counting: true,
           courseName: "Maple Hill",
@@ -169,7 +177,7 @@ describe("RoundsListPage", () => {
       rounds: [
         {
           id: 1,
-          createdAt: "",
+          createdAt: "2026-01-01 12:00:00",
           completedAt: null,
           counting: true,
           courseName: "Maple Hill",
@@ -211,7 +219,7 @@ describe("RoundsListPage", () => {
       rounds: [
         {
           id: 1,
-          createdAt: "",
+          createdAt: "2026-01-01 12:00:00",
           completedAt: null,
           counting: true,
           courseName: "Maple Hill",

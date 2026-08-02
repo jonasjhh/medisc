@@ -25,6 +25,7 @@ import type { Player } from "../players/api";
 import { deleteRound, listRounds } from "./api";
 import type { RoundFilters, RoundSummary } from "./api";
 import { ConfirmDeleteDialog } from "../shared/ConfirmDeleteDialog";
+import { formatDateTime } from "../shared/formatDateTime";
 import type { Status } from "../shared/status";
 
 export function RoundsListPage() {
@@ -201,9 +202,28 @@ export function RoundsListPage() {
                 <ListItemText
                   primary={`${round.courseName} — ${round.layoutName}`}
                   secondary={
-                    round.players.length > 0
-                      ? round.players.map((player) => player.name).join(", ")
-                      : "No players"
+                    <>
+                      <Typography
+                        component="span"
+                        variant="body2"
+                        color="text.secondary"
+                        display="block"
+                      >
+                        {round.players.length > 0
+                          ? round.players
+                              .map((player) => player.name)
+                              .join(", ")
+                          : "No players"}
+                      </Typography>
+                      <Typography
+                        component="span"
+                        variant="caption"
+                        color="text.secondary"
+                        display="block"
+                      >
+                        {formatDateTime(round.createdAt)}
+                      </Typography>
+                    </>
                   }
                 />
                 <Chip
