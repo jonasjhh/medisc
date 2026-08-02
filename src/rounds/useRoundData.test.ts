@@ -24,6 +24,7 @@ const baseRound: roundsApi.RoundDetail = {
       recorded: true,
     },
   ],
+  weather: null,
 };
 
 describe("useRoundData", () => {

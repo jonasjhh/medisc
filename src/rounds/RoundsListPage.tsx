@@ -24,6 +24,7 @@ import { listPlayers } from "../players/api";
 import type { Player } from "../players/api";
 import { deleteRound, listRounds } from "./api";
 import type { RoundFilters, RoundSummary } from "./api";
+import { formatWeather } from "./weather";
 import { ConfirmDeleteDialog } from "../shared/ConfirmDeleteDialog";
 import { formatDateTime } from "../shared/formatDateTime";
 import type { Status } from "../shared/status";
@@ -222,6 +223,7 @@ export function RoundsListPage() {
                         display="block"
                       >
                         {formatDateTime(round.createdAt)}
+                        {round.weather && ` · ${formatWeather(round.weather)}`}
                       </Typography>
                     </>
                   }

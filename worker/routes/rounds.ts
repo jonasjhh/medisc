@@ -2,12 +2,19 @@ import { Hono } from "hono";
 import type { AppEnv } from "../types";
 import { createRoundSchema, updateRoundSchema } from "../schemas";
 import { parseIntParam } from "../params";
+import { fetchWeather } from "../weather";
 import {
   roundDetailSchema,
   roundListResponseSchema,
 } from "../../shared/contracts/rounds";
 
-interface RoundRow {
+interface WeatherColumns {
+  temperature_celsius: number | null;
+  wind_speed_ms: number | null;
+  wind_direction_degrees: number | null;
+}
+
+interface RoundRow extends WeatherColumns {
   id: number;
   course_id: number;
   layout_id: number;
@@ -16,13 +23,28 @@ interface RoundRow {
   counting: number;
 }
 
-interface RoundListRow {
+interface RoundListRow extends WeatherColumns {
   id: number;
   created_at: string;
   completed_at: string | null;
   counting: number;
   course_name: string;
   layout_name: string;
+}
+
+function weatherFromRow(row: WeatherColumns) {
+  if (
+    row.temperature_celsius === null ||
+    row.wind_speed_ms === null ||
+    row.wind_direction_degrees === null
+  ) {
+    return null;
+  }
+  return {
+    temperatureCelsius: row.temperature_celsius,
+    windSpeedMs: row.wind_speed_ms,
+    windDirectionDegrees: row.wind_direction_degrees,
+  };
 }
 
 interface RoundListPlayerRow {
@@ -57,6 +79,8 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
     .prepare(
       `SELECT rounds.id, rounds.course_id, rounds.layout_id, rounds.created_at,
               rounds.completed_at, rounds.counting,
+              rounds.temperature_celsius, rounds.wind_speed_ms,
+              rounds.wind_direction_degrees,
               courses.name AS course_name, layouts.name AS layout_name
        FROM rounds
        JOIN courses ON courses.id = rounds.course_id
@@ -121,6 +145,7 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
       penalties: score.penalties,
       recorded: Boolean(score.recorded),
     })),
+    weather: weatherFromRow(round),
   });
 }
 
@@ -200,12 +225,32 @@ roundsRoute.post("/", async (c) => {
     .bind(layoutId)
     .all<{ id: number; par: number }>();
 
+  const course = await c.env.DB.prepare(
+    "SELECT latitude, longitude FROM courses WHERE id = ?",
+  )
+    .bind(courseId)
+    .first<{ latitude: number | null; longitude: number | null }>();
+  const weather =
+    course?.latitude != null && course.longitude != null
+      ? await fetchWeather(course.latitude, course.longitude)
+      : null;
+
   let roundId: number;
   try {
     const round = await c.env.DB.prepare(
-      "INSERT INTO rounds (course_id, layout_id, client_request_id) VALUES (?, ?, ?) RETURNING id",
+      `INSERT INTO rounds
+         (course_id, layout_id, client_request_id, temperature_celsius,
+          wind_speed_ms, wind_direction_degrees)
+       VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
     )
-      .bind(courseId, layoutId, idempotencyKey)
+      .bind(
+        courseId,
+        layoutId,
+        idempotencyKey,
+        weather?.temperatureCelsius ?? null,
+        weather?.windSpeedMs ?? null,
+        weather?.windDirectionDegrees ?? null,
+      )
       .first<{ id: number }>();
     roundId = round!.id;
   } catch (cause) {
@@ -269,6 +314,8 @@ roundsRoute.get("/", async (c) => {
 
   const { results } = await c.env.DB.prepare(
     `SELECT rounds.id, rounds.created_at, rounds.completed_at, rounds.counting,
+            rounds.temperature_celsius, rounds.wind_speed_ms,
+            rounds.wind_direction_degrees,
             courses.name AS course_name, layouts.name AS layout_name
      FROM rounds
      JOIN courses ON courses.id = rounds.course_id
@@ -308,6 +355,7 @@ roundsRoute.get("/", async (c) => {
         courseName: row.course_name,
         layoutName: row.layout_name,
         players: playersByRound.get(row.id) ?? [],
+        weather: weatherFromRow(row),
       })),
     }),
   );

@@ -32,6 +32,15 @@ export const holeScoreResponseSchema = roundScoreSchema.extend({
 });
 export type HoleScoreResponse = z.infer<typeof holeScoreResponseSchema>;
 
+// Fetched from yr.no when the round is created; null when the course has no
+// stored coordinates or the weather API call failed.
+export const roundWeatherSchema = z.object({
+  temperatureCelsius: z.number(),
+  windSpeedMs: z.number(),
+  windDirectionDegrees: z.number(),
+});
+export type RoundWeather = z.infer<typeof roundWeatherSchema>;
+
 export const roundDetailSchema = z.object({
   id: z.number(),
   createdAt: z.string(),
@@ -42,6 +51,7 @@ export const roundDetailSchema = z.object({
   holes: z.array(roundHoleSchema),
   players: z.array(roundPlayerSchema),
   scores: z.array(roundScoreSchema),
+  weather: roundWeatherSchema.nullable(),
 });
 export type RoundDetail = z.infer<typeof roundDetailSchema>;
 
@@ -53,6 +63,7 @@ export const roundSummarySchema = z.object({
   courseName: z.string(),
   layoutName: z.string(),
   players: z.array(roundPlayerSchema),
+  weather: roundWeatherSchema.nullable(),
 });
 export type RoundSummary = z.infer<typeof roundSummarySchema>;
 

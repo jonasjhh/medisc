@@ -99,6 +99,7 @@ describe("NewRoundPage", () => {
       holes: [],
       players: [],
       scores: [],
+      weather: null,
     });
     const user = userEvent.setup();
     renderPage();
@@ -142,6 +143,7 @@ describe("NewRoundPage", () => {
         holes: [],
         players: [],
         scores: [],
+        weather: null,
       });
     const user = userEvent.setup();
     renderPage();
@@ -313,6 +315,7 @@ describe("NewRoundPage", () => {
       holes: [],
       players: [],
       scores: [],
+      weather: null,
     });
     const user = userEvent.setup();
     renderPage();

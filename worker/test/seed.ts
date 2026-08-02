@@ -8,15 +8,21 @@ export interface SeedHole {
 
 export async function seedCourse(
   env: Env,
-  options: { courseName?: string; layoutName?: string; holes: SeedHole[] },
+  options: {
+    courseName?: string;
+    layoutName?: string;
+    holes: SeedHole[];
+    latitude?: number;
+    longitude?: number;
+  },
 ) {
   const courseName = options.courseName ?? "Maple Hill";
   const layoutName = options.layoutName ?? "Blue";
 
   const course = await env.DB.prepare(
-    "INSERT INTO courses (name) VALUES (?) RETURNING id",
+    "INSERT INTO courses (name, latitude, longitude) VALUES (?, ?, ?) RETURNING id",
   )
-    .bind(courseName)
+    .bind(courseName, options.latitude ?? null, options.longitude ?? null)
     .first<{ id: number }>();
 
   const layout = await env.DB.prepare(

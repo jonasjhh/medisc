@@ -31,6 +31,7 @@ function aRoundDetail(overrides: Partial<RoundDetail> = {}): RoundDetail {
     holes: [],
     players: [],
     scores: [],
+    weather: null,
     ...overrides,
   });
 }
@@ -44,6 +45,7 @@ function aRoundSummary(overrides: Partial<RoundSummary> = {}): RoundSummary {
     courseName: "Maple Hill",
     layoutName: "Blue",
     players: [{ id: 1, name: "Alice" }],
+    weather: null,
     ...overrides,
   });
 }

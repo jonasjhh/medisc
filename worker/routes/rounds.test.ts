@@ -1,5 +1,5 @@
-import { env } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { env, fetchMock } from "cloudflare:test";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { ZodTypeAny, z } from "zod";
 import app from "../index";
 import { seedCourse } from "../test/seed";
@@ -41,6 +41,11 @@ async function createPlayer(name: string) {
 }
 
 describe("rounds API", () => {
+  beforeAll(() => {
+    fetchMock.activate();
+    fetchMock.disableNetConnect();
+  });
+
   beforeEach(async () => {
     await env.DB.exec("DELETE FROM hole_scores");
     await env.DB.exec("DELETE FROM round_players");
@@ -84,6 +89,105 @@ describe("rounds API", () => {
       penalties: 0,
       recorded: false,
     });
+  });
+
+  it("leaves weather null when the course has no coordinates", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+
+    const res = await request("/api/rounds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+    });
+    expect(res.status).toBe(201);
+    const round = await json(res, roundDetailSchema);
+    expect(round.weather).toBeNull();
+  });
+
+  it("fetches and stores weather when the course has coordinates", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      holes: [{ number: 1, par: 3, distanceMeters: 90 }],
+      latitude: 63.4066,
+      longitude: 10.4738,
+    });
+    const alice = await createPlayer("Alice");
+
+    fetchMock
+      .get("https://api.met.no")
+      .intercept({
+        path: "/weatherapi/locationforecast/2.0/compact?lat=63.4066&lon=10.4738",
+        method: "GET",
+      })
+      .reply(200, {
+        properties: {
+          timeseries: [
+            {
+              time: "2026-01-01T12:00:00Z",
+              data: {
+                instant: {
+                  details: {
+                    air_temperature: 14.3,
+                    wind_speed: 3.2,
+                    wind_from_direction: 270,
+                  },
+                },
+              },
+            },
+          ],
+        },
+      });
+
+    const res = await request("/api/rounds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+    });
+    expect(res.status).toBe(201);
+    const round = await json(res, roundDetailSchema);
+    expect(round.weather).toEqual({
+      temperatureCelsius: 14.3,
+      windSpeedMs: 3.2,
+      windDirectionDegrees: 270,
+    });
+
+    const listRes = await json(
+      await request("/api/rounds"),
+      roundListResponseSchema,
+    );
+    expect(listRes.rounds[0].weather).toEqual({
+      temperatureCelsius: 14.3,
+      windSpeedMs: 3.2,
+      windDirectionDegrees: 270,
+    });
+  });
+
+  it("leaves weather null and still creates the round when the weather API fails", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      holes: [{ number: 1, par: 3, distanceMeters: 90 }],
+      latitude: 63.4066,
+      longitude: 10.4738,
+    });
+    const alice = await createPlayer("Alice");
+
+    fetchMock
+      .get("https://api.met.no")
+      .intercept({
+        path: "/weatherapi/locationforecast/2.0/compact?lat=63.4066&lon=10.4738",
+        method: "GET",
+      })
+      .reply(503, "Service Unavailable");
+
+    const res = await request("/api/rounds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+    });
+    expect(res.status).toBe(201);
+    const round = await json(res, roundDetailSchema);
+    expect(round.weather).toBeNull();
   });
 
   it("returns the same round when POST is retried with the same Idempotency-Key", async () => {

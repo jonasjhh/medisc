@@ -52,6 +52,7 @@ describe("RoundsListPage", () => {
             { id: 1, name: "Alice" },
             { id: 2, name: "Bob" },
           ],
+          weather: null,
         },
       ],
     });
@@ -70,6 +71,39 @@ describe("RoundsListPage", () => {
     expect(screen.getByText("15 Jan 2026 14:30")).toBeInTheDocument();
   });
 
+  it("shows weather alongside the date when available", async () => {
+    vi.mocked(roundsApi.listRounds).mockResolvedValue({
+      rounds: [
+        {
+          id: 1,
+          createdAt: "2026-01-15 14:30:00",
+          completedAt: null,
+          counting: true,
+          courseName: "Maple Hill",
+          layoutName: "Blue",
+          players: [{ id: 1, name: "Alice" }],
+          weather: {
+            temperatureCelsius: 14.3,
+            windSpeedMs: 3.2,
+            windDirectionDegrees: 270,
+          },
+        },
+      ],
+    });
+
+    render(
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <RoundsListPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByText("15 Jan 2026 14:30 · 14°C · 3.2 m/s W"),
+    ).toBeInTheDocument();
+  });
+
   it("shows a Completed chip for finished rounds", async () => {
     vi.mocked(roundsApi.listRounds).mockResolvedValue({
       rounds: [
@@ -84,6 +118,7 @@ describe("RoundsListPage", () => {
             { id: 1, name: "Alice" },
             { id: 2, name: "Bob" },
           ],
+          weather: null,
         },
       ],
     });
@@ -110,6 +145,7 @@ describe("RoundsListPage", () => {
           courseName: "Maple Hill",
           layoutName: "Blue",
           players: [],
+          weather: null,
         },
       ],
     });
@@ -179,6 +215,7 @@ describe("RoundsListPage", () => {
             { id: 1, name: "Alice" },
             { id: 2, name: "Bob" },
           ],
+          weather: null,
         },
       ],
     });
@@ -221,6 +258,7 @@ describe("RoundsListPage", () => {
             { id: 1, name: "Alice" },
             { id: 2, name: "Bob" },
           ],
+          weather: null,
         },
       ],
     });

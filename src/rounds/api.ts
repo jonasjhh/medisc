@@ -12,6 +12,7 @@ import type {
   RoundPlayer,
   RoundScore,
   RoundSummary,
+  RoundWeather,
 } from "../../shared/contracts/rounds";
 
 export type {
@@ -22,6 +23,7 @@ export type {
   RoundPlayer,
   RoundScore,
   RoundSummary,
+  RoundWeather,
 };
 
 export interface RoundFilters {

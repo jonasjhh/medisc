@@ -39,6 +39,7 @@ const baseRound: roundsApi.RoundDetail = {
       recorded: true,
     },
   ],
+  weather: null,
 };
 
 const twelveHoleRound: roundsApi.RoundDetail = {
@@ -63,6 +64,7 @@ const twelveHoleRound: roundsApi.RoundDetail = {
     penalties: 0,
     recorded: false,
   })),
+  weather: null,
 };
 
 function renderPage() {
