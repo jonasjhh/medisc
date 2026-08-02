@@ -33,7 +33,8 @@ export function ScoreDistributionChart({
     <Stack spacing={0.75} aria-label="Counting throw distribution">
       {ROWS.map(({ outcome, label }) => {
         const count = distribution[outcome];
-        const pct = (count / max) * 100;
+        const barPct = (count / max) * 100;
+        const sharePct = total > 0 ? Math.round((count / total) * 100) : 0;
         const barColor =
           outcome === "par"
             ? theme.palette.grey[500]
@@ -54,7 +55,7 @@ export function ScoreDistributionChart({
             >
               <Box
                 sx={{
-                  width: `${pct}%`,
+                  width: `${barPct}%`,
                   height: "100%",
                   borderRadius: 1,
                   bgcolor: count > 0 ? barColor : "transparent",
@@ -65,9 +66,9 @@ export function ScoreDistributionChart({
             <Typography
               variant="body2"
               fontWeight={600}
-              sx={{ width: 28, textAlign: "right", flexShrink: 0 }}
+              sx={{ width: 72, textAlign: "right", flexShrink: 0 }}
             >
-              {count}
+              {sharePct}% ({count})
             </Typography>
           </Stack>
         );

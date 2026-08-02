@@ -28,16 +28,17 @@ describe("ScoreDistributionChart", () => {
     expect(screen.getByText("Triple bogey+")).toBeInTheDocument();
   });
 
-  it("shows the count for each bucket", () => {
+  it("shows the percentage share and count for each bucket", () => {
     render(<ScoreDistributionChart distribution={distribution} />);
 
-    expect(screen.getByText("1")).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText("4")).toBeInTheDocument();
-    expect(screen.getByText("5")).toBeInTheDocument();
-    expect(screen.getByText("6")).toBeInTheDocument();
-    expect(screen.getByText("7")).toBeInTheDocument();
+    // Total is 28 (1+2+3+4+5+6+7), so each bucket's share is count/28 rounded.
+    expect(screen.getByText("4% (1)")).toBeInTheDocument();
+    expect(screen.getByText("7% (2)")).toBeInTheDocument();
+    expect(screen.getByText("11% (3)")).toBeInTheDocument();
+    expect(screen.getByText("14% (4)")).toBeInTheDocument();
+    expect(screen.getByText("18% (5)")).toBeInTheDocument();
+    expect(screen.getByText("21% (6)")).toBeInTheDocument();
+    expect(screen.getByText("25% (7)")).toBeInTheDocument();
   });
 
   it("shows the total counting throws recorded", () => {
