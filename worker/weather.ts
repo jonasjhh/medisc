@@ -8,6 +8,7 @@ export interface Weather {
   temperatureCelsius: number;
   windSpeedMs: number;
   windDirectionDegrees: number;
+  symbolCode: string | null;
 }
 
 interface LocationforecastResponse {
@@ -19,6 +20,13 @@ interface LocationforecastResponse {
             air_temperature?: number;
             wind_speed?: number;
             wind_from_direction?: number;
+          };
+        };
+        // Short-term (1h) summary; carries the icon code. Distinct from
+        // `instant.details` above, which yr.no always includes.
+        next_1_hours?: {
+          summary?: {
+            symbol_code?: string;
           };
         };
       };
@@ -46,7 +54,8 @@ export async function fetchWeather(
       return null;
     }
     const body = (await response.json()) as LocationforecastResponse;
-    const details = body.properties?.timeseries?.[0]?.data?.instant?.details;
+    const current = body.properties?.timeseries?.[0]?.data;
+    const details = current?.instant?.details;
     if (
       details?.air_temperature === undefined ||
       details.wind_speed === undefined ||
@@ -58,6 +67,7 @@ export async function fetchWeather(
       temperatureCelsius: details.air_temperature,
       windSpeedMs: details.wind_speed,
       windDirectionDegrees: details.wind_from_direction,
+      symbolCode: current?.next_1_hours?.summary?.symbol_code ?? null,
     };
   } catch {
     return null;

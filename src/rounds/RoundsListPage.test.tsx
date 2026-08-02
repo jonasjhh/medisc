@@ -86,6 +86,7 @@ describe("RoundsListPage", () => {
             temperatureCelsius: 14.3,
             windSpeedMs: 3.2,
             windDirectionDegrees: 270,
+            symbolCode: "partlycloudy_day",
           },
         },
       ],
@@ -99,9 +100,10 @@ describe("RoundsListPage", () => {
       </MemoryRouter>,
     );
 
-    expect(
-      await screen.findByText("15 Jan 2026 14:30 · 14°C · 3.2 m/s W"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("15 Jan 2026 14:30")).toBeInTheDocument();
+    expect(screen.getByText("14°C")).toBeInTheDocument();
+    expect(screen.getByText("3.2 m/s")).toBeInTheDocument();
+    expect(screen.getByLabelText("14°C · 3.2 m/s W")).toBeInTheDocument();
   });
 
   it("shows a Completed chip for finished rounds", async () => {

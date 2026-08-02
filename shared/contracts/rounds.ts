@@ -38,6 +38,9 @@ export const roundWeatherSchema = z.object({
   temperatureCelsius: z.number(),
   windSpeedMs: z.number(),
   windDirectionDegrees: z.number(),
+  // yr.no's symbol code, e.g. "partlycloudy_day" — null when their
+  // short-term summary wasn't present in the response.
+  symbolCode: z.string().nullable(),
 });
 export type RoundWeather = z.infer<typeof roundWeatherSchema>;
 

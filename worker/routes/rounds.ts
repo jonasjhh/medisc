@@ -12,6 +12,7 @@ interface WeatherColumns {
   temperature_celsius: number | null;
   wind_speed_ms: number | null;
   wind_direction_degrees: number | null;
+  weather_symbol_code: string | null;
 }
 
 interface RoundRow extends WeatherColumns {
@@ -44,6 +45,7 @@ function weatherFromRow(row: WeatherColumns) {
     temperatureCelsius: row.temperature_celsius,
     windSpeedMs: row.wind_speed_ms,
     windDirectionDegrees: row.wind_direction_degrees,
+    symbolCode: row.weather_symbol_code,
   };
 }
 
@@ -80,7 +82,7 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
       `SELECT rounds.id, rounds.course_id, rounds.layout_id, rounds.created_at,
               rounds.completed_at, rounds.counting,
               rounds.temperature_celsius, rounds.wind_speed_ms,
-              rounds.wind_direction_degrees,
+              rounds.wind_direction_degrees, rounds.weather_symbol_code,
               courses.name AS course_name, layouts.name AS layout_name
        FROM rounds
        JOIN courses ON courses.id = rounds.course_id
@@ -240,8 +242,8 @@ roundsRoute.post("/", async (c) => {
     const round = await c.env.DB.prepare(
       `INSERT INTO rounds
          (course_id, layout_id, client_request_id, temperature_celsius,
-          wind_speed_ms, wind_direction_degrees)
-       VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+          wind_speed_ms, wind_direction_degrees, weather_symbol_code)
+       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
     )
       .bind(
         courseId,
@@ -250,6 +252,7 @@ roundsRoute.post("/", async (c) => {
         weather?.temperatureCelsius ?? null,
         weather?.windSpeedMs ?? null,
         weather?.windDirectionDegrees ?? null,
+        weather?.symbolCode ?? null,
       )
       .first<{ id: number }>();
     roundId = round!.id;
@@ -315,7 +318,7 @@ roundsRoute.get("/", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT rounds.id, rounds.created_at, rounds.completed_at, rounds.counting,
             rounds.temperature_celsius, rounds.wind_speed_ms,
-            rounds.wind_direction_degrees,
+            rounds.wind_direction_degrees, rounds.weather_symbol_code,
             courses.name AS course_name, layouts.name AS layout_name
      FROM rounds
      JOIN courses ON courses.id = rounds.course_id

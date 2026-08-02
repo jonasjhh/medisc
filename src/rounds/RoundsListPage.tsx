@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import DeleteIcon from "@mui/icons-material/Delete";
+import NavigationIcon from "@mui/icons-material/Navigation";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
@@ -23,11 +24,43 @@ import type { CourseSummary } from "../courses/api";
 import { listPlayers } from "../players/api";
 import type { Player } from "../players/api";
 import { deleteRound, listRounds } from "./api";
-import type { RoundFilters, RoundSummary } from "./api";
-import { formatWeather } from "./weather";
+import type { RoundFilters, RoundSummary, RoundWeather } from "./api";
+import { formatWeather, weatherIcon, windArrowRotation } from "./weather";
 import { ConfirmDeleteDialog } from "../shared/ConfirmDeleteDialog";
 import { formatDateTime } from "../shared/formatDateTime";
 import type { Status } from "../shared/status";
+
+function RoundWeatherBadge({ weather }: { weather: RoundWeather }) {
+  const WeatherIcon = weatherIcon(weather.symbolCode);
+  return (
+    <Stack
+      component="span"
+      direction="row"
+      spacing={0.5}
+      alignItems="center"
+      aria-label={formatWeather(weather)}
+    >
+      <WeatherIcon
+        aria-hidden="true"
+        sx={{ fontSize: 14, color: "text.secondary" }}
+      />
+      <Typography component="span" variant="caption" color="text.secondary">
+        {Math.round(weather.temperatureCelsius)}°C
+      </Typography>
+      <NavigationIcon
+        aria-hidden="true"
+        sx={{
+          fontSize: 14,
+          color: "text.secondary",
+          transform: `rotate(${windArrowRotation(weather.windDirectionDegrees)}deg)`,
+        }}
+      />
+      <Typography component="span" variant="caption" color="text.secondary">
+        {weather.windSpeedMs.toFixed(1)} m/s
+      </Typography>
+    </Stack>
+  );
+}
 
 export function RoundsListPage() {
   const [rounds, setRounds] = useState<RoundSummary[]>([]);
@@ -216,15 +249,24 @@ export function RoundsListPage() {
                               .join(", ")
                           : "No players"}
                       </Typography>
-                      <Typography
+                      <Stack
                         component="span"
-                        variant="caption"
-                        color="text.secondary"
-                        display="block"
+                        direction="row"
+                        spacing={0.75}
+                        alignItems="center"
+                        flexWrap="wrap"
                       >
-                        {formatDateTime(round.createdAt)}
-                        {round.weather && ` · ${formatWeather(round.weather)}`}
-                      </Typography>
+                        <Typography
+                          component="span"
+                          variant="caption"
+                          color="text.secondary"
+                        >
+                          {formatDateTime(round.createdAt)}
+                        </Typography>
+                        {round.weather && (
+                          <RoundWeatherBadge weather={round.weather} />
+                        )}
+                      </Stack>
                     </>
                   }
                 />

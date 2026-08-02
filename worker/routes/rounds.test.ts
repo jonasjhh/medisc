@@ -133,6 +133,9 @@ describe("rounds API", () => {
                     wind_from_direction: 270,
                   },
                 },
+                next_1_hours: {
+                  summary: { symbol_code: "partlycloudy_day" },
+                },
               },
             },
           ],
@@ -150,6 +153,7 @@ describe("rounds API", () => {
       temperatureCelsius: 14.3,
       windSpeedMs: 3.2,
       windDirectionDegrees: 270,
+      symbolCode: "partlycloudy_day",
     });
 
     const listRes = await json(
@@ -160,6 +164,7 @@ describe("rounds API", () => {
       temperatureCelsius: 14.3,
       windSpeedMs: 3.2,
       windDirectionDegrees: 270,
+      symbolCode: "partlycloudy_day",
     });
   });
 
