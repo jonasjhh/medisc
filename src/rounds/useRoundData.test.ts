@@ -1,9 +1,23 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { useRoundData } from "./useRoundData";
 import * as roundsApi from "./api";
+import {
+  closeHoleScoreQueueDbForTests,
+  getQueuedHoleScoreUpdates,
+} from "./holeScoreQueue";
 
 vi.mock("./api");
+
+async function deleteQueueDb(): Promise<void> {
+  await closeHoleScoreQueueDbForTests();
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase("medisc-write-queue");
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error as Error);
+    request.onblocked = () => resolve();
+  });
+}
 
 const baseRound: roundsApi.RoundDetail = {
   id: 1,
@@ -30,6 +44,10 @@ const baseRound: roundsApi.RoundDetail = {
 describe("useRoundData", () => {
   beforeEach(() => {
     vi.mocked(roundsApi.getRound).mockResolvedValue(baseRound);
+  });
+
+  afterEach(async () => {
+    await deleteQueueDb();
   });
 
   it("loads the round and reports ready", async () => {
@@ -83,6 +101,26 @@ describe("useRoundData", () => {
     // server's (unchanged) copy of the round.
     expect(roundsApi.getRound).toHaveBeenCalledTimes(2);
     expect(result.current.round?.scores[0].strokes).toBe(3);
+  });
+
+  it("keeps the optimistic value and queues the update when offline", async () => {
+    vi.mocked(roundsApi.updateHoleScore).mockRejectedValue(
+      new TypeError("Failed to fetch"),
+    );
+    const { result } = renderHook(() => useRoundData(1));
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    await act(async () => {
+      await result.current.setScore(1000, "strokes", 4);
+    });
+
+    expect(result.current.round?.scores[0].strokes).toBe(4);
+    expect(result.current.error).toBeNull();
+    // A network failure shouldn't trigger the error-path refresh().
+    expect(roundsApi.getRound).toHaveBeenCalledTimes(1);
+    expect(await getQueuedHoleScoreUpdates()).toEqual([
+      { holeScoreId: 1000, strokes: 4 },
+    ]);
   });
 
   it("adjust() never lets strokes drop below 1", async () => {

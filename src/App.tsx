@@ -40,6 +40,8 @@ import { IdentityModal } from "./identity/IdentityModal";
 import { LinkCodeDialog } from "./identity/LinkCodeDialog";
 import { UnclaimDialog } from "./identity/UnclaimDialog";
 import { useIdentity } from "./identity/useIdentity";
+import { HoleScoreSyncToast } from "./rounds/HoleScoreSyncToast";
+import { useHoleScoreQueueSync } from "./rounds/useHoleScoreQueue";
 
 const modeIcons: Record<ThemeModePreference, typeof LightModeIcon> = {
   light: LightModeIcon,
@@ -200,6 +202,8 @@ function NavBar() {
 }
 
 export function App() {
+  useHoleScoreQueueSync();
+
   return (
     <BrowserRouter
       basename={import.meta.env.BASE_URL}
@@ -209,6 +213,7 @@ export function App() {
       <UpdatePrompt />
       <InstallPrompt />
       <IdentityModal />
+      <HoleScoreSyncToast />
       <NavBar />
       <Box component="main">
         <Routes>

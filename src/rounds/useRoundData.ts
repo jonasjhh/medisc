@@ -7,6 +7,7 @@ import {
   updateRound,
 } from "./api";
 import type { RoundDetail } from "./api";
+import { enqueueHoleScoreUpdate } from "./holeScoreQueue";
 import type { Status } from "../shared/status";
 
 export type Field = "strokes" | "penalties";
@@ -55,6 +56,13 @@ export function useRoundData(id: number) {
     try {
       await updateHoleScore(scoreId, { [field]: nextValue });
     } catch (err) {
+      if (err instanceof TypeError) {
+        // Offline: the tap is real input, not a mistake, so keep the
+        // optimistic value on screen and replay it once back in range
+        // instead of reverting it and showing a scary error.
+        await enqueueHoleScoreUpdate(scoreId, { [field]: nextValue });
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to save score");
       await refresh();
     }

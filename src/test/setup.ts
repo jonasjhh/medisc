@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom/vitest";
+import "fake-indexeddb/auto";
 import { vi } from "vitest";
 
 // vite-plugin-pwa's virtual module only exists at build time; stub it so
