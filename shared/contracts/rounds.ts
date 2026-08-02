@@ -52,7 +52,7 @@ export const roundSummarySchema = z.object({
   counting: z.boolean(),
   courseName: z.string(),
   layoutName: z.string(),
-  playerCount: z.number(),
+  players: z.array(roundPlayerSchema),
 });
 export type RoundSummary = z.infer<typeof roundSummarySchema>;
 

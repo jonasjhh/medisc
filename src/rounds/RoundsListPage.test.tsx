@@ -40,7 +40,10 @@ describe("RoundsListPage", () => {
           counting: true,
           courseName: "Maple Hill",
           layoutName: "Blue",
-          playerCount: 2,
+          players: [
+            { id: 1, name: "Alice" },
+            { id: 2, name: "Bob" },
+          ],
         },
       ],
     });
@@ -54,7 +57,7 @@ describe("RoundsListPage", () => {
     );
 
     expect(await screen.findByText("Maple Hill — Blue")).toBeInTheDocument();
-    expect(screen.getByText("2 players")).toBeInTheDocument();
+    expect(screen.getByText("Alice, Bob")).toBeInTheDocument();
     expect(screen.getByText("In progress")).toBeInTheDocument();
   });
 
@@ -68,7 +71,10 @@ describe("RoundsListPage", () => {
           counting: true,
           courseName: "Maple Hill",
           layoutName: "Blue",
-          playerCount: 2,
+          players: [
+            { id: 1, name: "Alice" },
+            { id: 2, name: "Bob" },
+          ],
         },
       ],
     });
@@ -82,6 +88,33 @@ describe("RoundsListPage", () => {
     );
 
     expect(await screen.findByText("Completed")).toBeInTheDocument();
+  });
+
+  it("shows a fallback when a round has no players", async () => {
+    vi.mocked(roundsApi.listRounds).mockResolvedValue({
+      rounds: [
+        {
+          id: 1,
+          createdAt: "",
+          completedAt: null,
+          counting: true,
+          courseName: "Maple Hill",
+          layoutName: "Blue",
+          players: [],
+        },
+      ],
+    });
+
+    render(
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <RoundsListPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Maple Hill — Blue")).toBeInTheDocument();
+    expect(screen.getByText("No players")).toBeInTheDocument();
   });
 
   it("shows an empty state", async () => {
@@ -133,7 +166,10 @@ describe("RoundsListPage", () => {
           counting: true,
           courseName: "Maple Hill",
           layoutName: "Blue",
-          playerCount: 2,
+          players: [
+            { id: 1, name: "Alice" },
+            { id: 2, name: "Bob" },
+          ],
         },
       ],
     });
@@ -172,7 +208,10 @@ describe("RoundsListPage", () => {
           counting: true,
           courseName: "Maple Hill",
           layoutName: "Blue",
-          playerCount: 2,
+          players: [
+            { id: 1, name: "Alice" },
+            { id: 2, name: "Bob" },
+          ],
         },
       ],
     });

@@ -178,13 +178,18 @@ describe("rounds API", () => {
     expect(res.status).toBe(404);
   });
 
-  it("lists rounds with player counts", async () => {
+  it("lists rounds with player names", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
+    const bob = await createPlayer("Bob");
     await request("/api/rounds", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      body: JSON.stringify({
+        courseId,
+        layoutId,
+        playerIds: [alice.id, bob.id],
+      }),
     });
 
     const res = await request("/api/rounds");
@@ -192,7 +197,10 @@ describe("rounds API", () => {
     expect(rounds).toHaveLength(1);
     expect(rounds[0]).toMatchObject({
       courseName: "Maple Hill",
-      playerCount: 1,
+      players: [
+        { id: alice.id, name: "Alice" },
+        { id: bob.id, name: "Bob" },
+      ],
     });
   });
 

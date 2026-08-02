@@ -200,7 +200,11 @@ export function RoundsListPage() {
               >
                 <ListItemText
                   primary={`${round.courseName} — ${round.layoutName}`}
-                  secondary={`${round.playerCount} player${round.playerCount === 1 ? "" : "s"}`}
+                  secondary={
+                    round.players.length > 0
+                      ? round.players.map((player) => player.name).join(", ")
+                      : "No players"
+                  }
                 />
                 <Chip
                   label={round.completedAt ? "Completed" : "In progress"}

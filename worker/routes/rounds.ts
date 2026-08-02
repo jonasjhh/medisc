@@ -23,7 +23,12 @@ interface RoundListRow {
   counting: number;
   course_name: string;
   layout_name: string;
-  player_count: number;
+}
+
+interface RoundListPlayerRow {
+  round_id: number;
+  id: number;
+  name: string;
 }
 
 interface HoleRow {
@@ -264,18 +269,34 @@ roundsRoute.get("/", async (c) => {
 
   const { results } = await c.env.DB.prepare(
     `SELECT rounds.id, rounds.created_at, rounds.completed_at, rounds.counting,
-            courses.name AS course_name, layouts.name AS layout_name,
-            COUNT(DISTINCT round_players.player_id) AS player_count
+            courses.name AS course_name, layouts.name AS layout_name
      FROM rounds
      JOIN courses ON courses.id = rounds.course_id
      JOIN layouts ON layouts.id = rounds.layout_id
-     LEFT JOIN round_players ON round_players.round_id = rounds.id
      ${where}
-     GROUP BY rounds.id
      ORDER BY rounds.created_at DESC`,
   )
     .bind(...params)
     .all<RoundListRow>();
+
+  const playersByRound = new Map<number, { id: number; name: string }[]>();
+  if (results.length > 0) {
+    const placeholders = results.map(() => "?").join(",");
+    const { results: playerRows } = await c.env.DB.prepare(
+      `SELECT round_players.round_id AS round_id, players.id, players.name
+       FROM round_players
+       JOIN players ON players.id = round_players.player_id
+       WHERE round_players.round_id IN (${placeholders})
+       ORDER BY round_players.round_id, players.name`,
+    )
+      .bind(...results.map((row) => row.id))
+      .all<RoundListPlayerRow>();
+    for (const row of playerRows) {
+      const players = playersByRound.get(row.round_id) ?? [];
+      players.push({ id: row.id, name: row.name });
+      playersByRound.set(row.round_id, players);
+    }
+  }
 
   return c.json(
     roundListResponseSchema.parse({
@@ -286,7 +307,7 @@ roundsRoute.get("/", async (c) => {
         counting: Boolean(row.counting),
         courseName: row.course_name,
         layoutName: row.layout_name,
-        playerCount: row.player_count,
+        players: playersByRound.get(row.id) ?? [],
       })),
     }),
   );

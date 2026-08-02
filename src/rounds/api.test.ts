@@ -43,7 +43,7 @@ function aRoundSummary(overrides: Partial<RoundSummary> = {}): RoundSummary {
     counting: true,
     courseName: "Maple Hill",
     layoutName: "Blue",
-    playerCount: 1,
+    players: [{ id: 1, name: "Alice" }],
     ...overrides,
   });
 }
