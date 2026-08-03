@@ -326,7 +326,108 @@ describe("PlayersListPage", () => {
     renderPage();
 
     await screen.findByText("Alice");
-    expect(screen.getByText("Claimed")).toBeInTheDocument();
+    // "Claimed" also names the section heading above the list, so scope
+    // the chip lookup to Alice's row to avoid matching both.
+    expect(
+      within(screen.getByRole("listitem")).getByText("Claimed"),
+    ).toBeInTheDocument();
+  });
+
+  it("splits players into alphabetically sorted Claimed and Guests sections", async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [
+        {
+          id: 1,
+          name: "Zeb",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: null,
+        },
+        {
+          id: 2,
+          name: "Amy",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: null,
+        },
+        {
+          id: 3,
+          name: "Yara",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: 10,
+        },
+        {
+          id: 4,
+          name: "Bo",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: 20,
+        },
+      ],
+    });
+
+    renderPage();
+
+    await screen.findByText("Zeb");
+
+    expect(
+      screen.getByRole("heading", { name: "Claimed" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Guests" })).toBeInTheDocument();
+
+    const rows = screen.getAllByRole("listitem").map((row) => row.textContent);
+    // Claimed section (Bo, Yara) sorted alphabetically, then Guests (Amy, Zeb).
+    expect(rows[0]).toContain("Bo");
+    expect(rows[1]).toContain("Yara");
+    expect(rows[2]).toContain("Amy");
+    expect(rows[3]).toContain("Zeb");
+  });
+
+  it("hides the Claimed section when no players are claimed", async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: null,
+        },
+      ],
+    });
+
+    renderPage();
+
+    await screen.findByText("Alice");
+    expect(
+      screen.queryByRole("heading", { name: "Claimed" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Guests" })).toBeInTheDocument();
+  });
+
+  it("hides the Guests section when every player is claimed", async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({
+      players: [
+        {
+          id: 1,
+          name: "Alice",
+          createdAt: "",
+          roundCount: 0,
+          claimedByUserId: 5,
+        },
+      ],
+    });
+
+    renderPage();
+
+    await screen.findByText("Alice");
+    expect(
+      screen.queryByRole("heading", { name: "Guests" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Claimed" }),
+    ).toBeInTheDocument();
   });
 
   it("shows a You pill for the current user's claimed player", async () => {

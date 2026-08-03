@@ -26,6 +26,139 @@ import { useIdentity } from "../identity/useIdentity";
 import { ConfirmDeleteDialog } from "../shared/ConfirmDeleteDialog";
 import type { Status } from "../shared/status";
 
+function byName(a: Player, b: Player) {
+  return a.name.localeCompare(b.name);
+}
+
+function PlayerRow({
+  player,
+  editing,
+  draftName,
+  onDraftNameChange,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onDeleteRequest,
+  canEdit,
+  currentUserId,
+}: {
+  player: Player;
+  editing: boolean;
+  draftName: string;
+  onDraftNameChange: (value: string) => void;
+  onStartEdit: () => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+  onDeleteRequest: () => void;
+  canEdit: boolean;
+  currentUserId: number | undefined;
+}) {
+  return (
+    <ListItem
+      disablePadding
+      secondaryAction={
+        editing ? (
+          <>
+            <IconButton edge="end" aria-label="save name" onClick={onSaveEdit}>
+              <CheckIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              edge="end"
+              aria-label="cancel edit"
+              onClick={onCancelEdit}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </>
+        ) : (
+          <>
+            <Tooltip
+              title={
+                canEdit
+                  ? ""
+                  : "Only the player who claimed this profile can edit it"
+              }
+            >
+              <span>
+                <IconButton
+                  aria-label={`edit ${player.name}`}
+                  disabled={!canEdit}
+                  onClick={onStartEdit}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip
+              title={
+                player.claimedByUserId !== null
+                  ? "This player is claimed and can't be deleted — unclaim it from Settings first"
+                  : player.roundCount > 0
+                    ? "Can't delete a player with recorded rounds"
+                    : ""
+              }
+            >
+              <span>
+                <IconButton
+                  edge="end"
+                  aria-label={`delete ${player.name}`}
+                  disabled={
+                    player.roundCount > 0 || player.claimedByUserId !== null
+                  }
+                  onClick={onDeleteRequest}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </>
+        )
+      }
+    >
+      {editing ? (
+        <Box sx={{ pl: 2, pr: 9, py: 1, width: "100%" }}>
+          <TextField
+            label="Name"
+            size="small"
+            fullWidth
+            autoFocus
+            value={draftName}
+            onChange={(event) => onDraftNameChange(event.target.value)}
+          />
+        </Box>
+      ) : (
+        <ListItemButton
+          component={RouterLink}
+          to={`/players/${player.id}`}
+          sx={{ pr: 12 }}
+        >
+          <ListItemText
+            sx={{ minWidth: 0 }}
+            primary={
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={1}
+                sx={{ minWidth: 0 }}
+              >
+                <Typography component="span" noWrap sx={{ minWidth: 0 }}>
+                  {player.name}
+                </Typography>
+                <Box sx={{ flexShrink: 0 }}>
+                  <ClaimedStatusChip
+                    claimedByUserId={player.claimedByUserId}
+                    currentUserId={currentUserId}
+                  />
+                </Box>
+              </Stack>
+            }
+          />
+        </ListItemButton>
+      )}
+    </ListItem>
+  );
+}
+
 export function PlayersListPage() {
   const { user } = useIdentity();
   const [players, setPlayers] = useState<Player[]>([]);
@@ -80,10 +213,15 @@ export function PlayersListPage() {
   const canEdit = (player: Player) =>
     player.claimedByUserId === null || player.claimedByUserId === user?.id;
 
+  const claimedPlayers = players
+    .filter((player) => player.claimedByUserId !== null)
+    .sort(byName);
+  const guestPlayers = players
+    .filter((player) => player.claimedByUserId === null)
+    .sort(byName);
+
   const handlePlayerAdded = (player: Player) => {
-    setPlayers((prev) =>
-      [...prev, player].sort((a, b) => a.name.localeCompare(b.name)),
-    );
+    setPlayers((prev) => [...prev, player]);
   };
 
   const handleDelete = async () => {
@@ -124,113 +262,76 @@ export function PlayersListPage() {
       {status === "loading" && <CircularProgress />}
 
       {status === "ready" && (
-        <List component={Paper} variant="outlined" disablePadding>
-          {players.map((player) => (
-            <ListItem
-              key={player.id}
-              disablePadding
-              secondaryAction={
-                editingId === player.id ? (
-                  <>
-                    <IconButton
-                      edge="end"
-                      aria-label="save name"
-                      onClick={() => void saveEdit(player.id)}
-                    >
-                      <CheckIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      edge="end"
-                      aria-label="cancel edit"
-                      onClick={cancelEdit}
-                    >
-                      <CloseIcon fontSize="small" />
-                    </IconButton>
-                  </>
-                ) : (
-                  <>
-                    <Tooltip
-                      title={
-                        canEdit(player)
-                          ? ""
-                          : "Only the player who claimed this profile can edit it"
-                      }
-                    >
-                      <span>
-                        <IconButton
-                          aria-label={`edit ${player.name}`}
-                          disabled={!canEdit(player)}
-                          onClick={() => startEdit(player)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    <Tooltip
-                      title={
-                        player.claimedByUserId !== null
-                          ? "This player is claimed and can't be deleted — unclaim it from Settings first"
-                          : player.roundCount > 0
-                            ? "Can't delete a player with recorded rounds"
-                            : ""
-                      }
-                    >
-                      <span>
-                        <IconButton
-                          edge="end"
-                          aria-label={`delete ${player.name}`}
-                          disabled={
-                            player.roundCount > 0 ||
-                            player.claimedByUserId !== null
-                          }
-                          onClick={() => setDeleteTarget(player)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </>
-                )
-              }
-            >
-              {editingId === player.id ? (
-                <Box sx={{ pl: 2, pr: 9, py: 1, width: "100%" }}>
-                  <TextField
-                    label="Name"
-                    size="small"
-                    fullWidth
-                    autoFocus
-                    value={draftName}
-                    onChange={(event) => setDraftName(event.target.value)}
+        <>
+          {claimedPlayers.length > 0 && (
+            <>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                sx={{ mb: 1 }}
+              >
+                Claimed
+              </Typography>
+              <List
+                component={Paper}
+                variant="outlined"
+                disablePadding
+                sx={{ mb: 3 }}
+              >
+                {claimedPlayers.map((player) => (
+                  <PlayerRow
+                    key={player.id}
+                    player={player}
+                    editing={editingId === player.id}
+                    draftName={draftName}
+                    onDraftNameChange={setDraftName}
+                    onStartEdit={() => startEdit(player)}
+                    onSaveEdit={() => void saveEdit(player.id)}
+                    onCancelEdit={cancelEdit}
+                    onDeleteRequest={() => setDeleteTarget(player)}
+                    canEdit={canEdit(player)}
+                    currentUserId={user?.id}
                   />
-                </Box>
-              ) : (
-                <ListItemButton
-                  component={RouterLink}
-                  to={`/players/${player.id}`}
-                  sx={{ pr: 12 }}
-                >
-                  <ListItemText
-                    primary={
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <span>{player.name}</span>
-                        <ClaimedStatusChip
-                          claimedByUserId={player.claimedByUserId}
-                          currentUserId={user?.id}
-                        />
-                      </Stack>
-                    }
+                ))}
+              </List>
+            </>
+          )}
+
+          {guestPlayers.length > 0 && (
+            <>
+              <Typography
+                variant="subtitle2"
+                color="text.secondary"
+                sx={{ mb: 1 }}
+              >
+                Guests
+              </Typography>
+              <List component={Paper} variant="outlined" disablePadding>
+                {guestPlayers.map((player) => (
+                  <PlayerRow
+                    key={player.id}
+                    player={player}
+                    editing={editingId === player.id}
+                    draftName={draftName}
+                    onDraftNameChange={setDraftName}
+                    onStartEdit={() => startEdit(player)}
+                    onSaveEdit={() => void saveEdit(player.id)}
+                    onCancelEdit={cancelEdit}
+                    onDeleteRequest={() => setDeleteTarget(player)}
+                    canEdit={canEdit(player)}
+                    currentUserId={user?.id}
                   />
-                </ListItemButton>
-              )}
-            </ListItem>
-          ))}
+                ))}
+              </List>
+            </>
+          )}
+
           {players.length === 0 && (
-            <Typography color="text.secondary" sx={{ p: 2 }}>
+            <Typography color="text.secondary">
               No players yet — add one above.
             </Typography>
           )}
-        </List>
+        </>
       )}
 
       <ConfirmDeleteDialog
