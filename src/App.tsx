@@ -25,7 +25,6 @@ import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import { HomePage } from "./pages/HomePage";
 import { CoursesPage } from "./courses/CoursesPage";
-import { CourseDetailPage } from "./courses/CourseDetailPage";
 import { NewRoundPage } from "./rounds/NewRoundPage";
 import { RoundPage } from "./rounds/RoundPage";
 import { RoundsListPage } from "./rounds/RoundsListPage";
@@ -219,7 +218,6 @@ export function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/courses" element={<CoursesPage />} />
-          <Route path="/courses/:courseId" element={<CourseDetailPage />} />
           <Route path="/rounds" element={<RoundsListPage />} />
           <Route path="/rounds/new" element={<NewRoundPage />} />
           <Route path="/rounds/:roundId" element={<RoundPage />} />

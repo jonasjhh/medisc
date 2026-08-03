@@ -1,5 +1,4 @@
 import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -70,31 +69,27 @@ function HoleGroupTable({
   );
 }
 
-export function LayoutCard({ layout }: { layout: Layout }) {
+export function LayoutHoleTables({ layout }: { layout: Layout }) {
   const groups = chunk(layout.holes, HOLES_PER_GROUP);
 
-  return (
-    <Paper variant="outlined" sx={{ p: 1.5 }}>
-      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-        {layout.name}
+  if (groups.length === 0) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        No holes yet.
       </Typography>
+    );
+  }
 
-      {groups.length > 0 ? (
-        <Stack spacing={1.5}>
-          {groups.map((holes) => (
-            <Box key={holes[0].id} sx={{ overflowX: "auto" }}>
-              <HoleGroupTable
-                holes={holes}
-                caption={`${layout.name}, holes ${holes[0].number}–${holes[holes.length - 1].number}`}
-              />
-            </Box>
-          ))}
-        </Stack>
-      ) : (
-        <Typography variant="body2" color="text.secondary">
-          No holes yet.
-        </Typography>
-      )}
-    </Paper>
+  return (
+    <Stack spacing={1.5}>
+      {groups.map((holes) => (
+        <Box key={holes[0].id} sx={{ overflowX: "auto" }}>
+          <HoleGroupTable
+            holes={holes}
+            caption={`${layout.name}, holes ${holes[0].number}–${holes[holes.length - 1].number}`}
+          />
+        </Box>
+      ))}
+    </Stack>
   );
 }
