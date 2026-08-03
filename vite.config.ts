@@ -58,6 +58,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
+    // formatDateTime() renders in the local timezone by design; pin the
+    // test runner's zone to UTC so assertions matching UTC timestamps
+    // don't depend on wherever the repo happens to be cloned.
+    env: { TZ: "UTC" },
     setupFiles: ["./src/test/setup.ts"],
     css: true,
     // Without this, vi.fn() call history survives across tests in the same
