@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -19,6 +19,27 @@ export function RoundPage() {
   const id = Number(roundId);
   const data = useRoundData(id);
   const [stepIndex, setStepIndex] = useState(0);
+
+  // Finishing/reopening changes whether a leading summary step exists,
+  // shifting every later index by one — without this, the view would
+  // silently land on a different hole than the one just being edited.
+  // Skip on the very first isCompleted we see (initial load) so a
+  // freshly-opened completed round keeps its natural landing step (the
+  // leading summary) instead of always being forced to 0.
+  const isCompletedNow = data.round ? data.round.completedAt !== null : null;
+  const prevIsCompletedRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (isCompletedNow === null) {
+      return;
+    }
+    if (
+      prevIsCompletedRef.current !== null &&
+      prevIsCompletedRef.current !== isCompletedNow
+    ) {
+      setStepIndex(0);
+    }
+    prevIsCompletedRef.current = isCompletedNow;
+  }, [isCompletedNow]);
 
   if (data.status === "loading") {
     return (
@@ -44,7 +65,7 @@ export function RoundPage() {
     round.scores.map((score) => [`${score.holeId}:${score.playerId}`, score]),
   );
 
-  const steps = buildSteps(holeGroups);
+  const steps = buildSteps(holeGroups, isCompleted);
   const step = steps[stepIndex];
   const isFirstStep = stepIndex === 0;
   const isLastStep = stepIndex === steps.length - 1;

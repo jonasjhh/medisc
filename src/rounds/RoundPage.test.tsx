@@ -276,7 +276,7 @@ describe("RoundPage", () => {
     });
     renderPage();
 
-    await screen.findByText("Hole 1");
+    await screen.findByText("Completed");
     expect(
       screen.getByRole("checkbox", { name: /counting round/i }),
     ).toBeDisabled();
@@ -330,7 +330,7 @@ describe("RoundPage", () => {
     });
     renderPage();
 
-    await screen.findByText("Hole 1");
+    await screen.findByText("Completed");
     expect(
       screen.queryByRole("button", { name: /manage players/i }),
     ).not.toBeInTheDocument();
@@ -382,8 +382,13 @@ describe("RoundPage", () => {
       ...baseRound,
       completedAt: "2026-01-01 12:00:00",
     });
+    const user = userEvent.setup();
     renderPage();
 
+    await screen.findByText("Completed");
+    // Completed rounds land on the summary first; step forward onto a
+    // hole to check quick-score buttons are absent there too.
+    await user.click(screen.getByRole("button", { name: /next hole/i }));
     await screen.findByText("Hole 1");
     expect(
       screen.queryByRole("button", { name: "Birdie" }),
@@ -488,6 +493,49 @@ describe("RoundPage", () => {
     await user.click(screen.getByRole("button", { name: /previous hole/i }));
 
     expect(await screen.findByText("Hole 2")).toBeInTheDocument();
+  });
+
+  it("shows the summary before hole 1 when opening a completed round", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+    });
+    renderPage();
+
+    expect(await screen.findByText("Summary")).toBeInTheDocument();
+    // Alice: 3 + 4 = 7 strokes against a course par of 7 (3 + 4) → even.
+    expect(screen.getByText("Alice: 7 (E)")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /previous hole/i }),
+    ).toBeDisabled();
+  });
+
+  it("navigates from the leading summary to hole 1 on a completed round", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Summary");
+    await user.click(screen.getByRole("button", { name: /next hole/i }));
+
+    expect(await screen.findByText("Hole 1")).toBeInTheDocument();
+  });
+
+  it("jumps to the summary right after finishing a round", async () => {
+    vi.mocked(roundsApi.completeRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: /finish round/i }));
+
+    expect(await screen.findByText("Summary")).toBeInTheDocument();
   });
 
   it("shows an F9 checkpoint after the front 9 with cumulative totals", async () => {
