@@ -30,6 +30,23 @@ const adjusterButtonSx = (theme: Theme) => ({
   },
 });
 
+// Deliberately plainer than the primary adjuster (smaller, neutral instead
+// of tinted primary): penalties is the rare edge-case input, so it should
+// read as secondary to strokes rather than competing with it.
+const compactAdjusterButtonSx = (theme: Theme) => ({
+  width: 30,
+  height: 30,
+  bgcolor: theme.palette.action.selected,
+  color: theme.palette.text.secondary,
+  "&:hover": {
+    bgcolor: theme.palette.action.hover,
+  },
+  "&.Mui-disabled": {
+    bgcolor: "action.disabledBackground",
+    color: "action.disabled",
+  },
+});
+
 export function ScoreAdjuster({
   label,
   value,
@@ -39,6 +56,7 @@ export function ScoreAdjuster({
   readOnly = false,
   outcome,
   recorded = true,
+  size = "default",
 }: {
   label: string;
   value: number;
@@ -48,9 +66,11 @@ export function ScoreAdjuster({
   readOnly?: boolean;
   outcome?: ScoreOutcome;
   recorded?: boolean;
+  size?: "default" | "compact";
 }) {
   const theme = useTheme();
   const mode = theme.palette.mode;
+  const compact = size === "compact";
   const color =
     outcome && outcome !== "par"
       ? adjusterTextColors[outcome][mode]
@@ -61,20 +81,28 @@ export function ScoreAdjuster({
       <Typography variant="caption" color="text.secondary">
         {label}
       </Typography>
-      <Box display="flex" alignItems="center" gap={1.5}>
+      <Box
+        display="flex"
+        alignItems="center"
+        gap={compact ? 1 : 1.5}
+        sx={{ minHeight: 40 }}
+      >
         {!readOnly && (
           <IconButton
             aria-label={`decrease ${label.toLowerCase()}`}
             onClick={onDecrement}
             disabled={value <= min}
-            sx={adjusterButtonSx(theme)}
+            sx={
+              compact ? compactAdjusterButtonSx(theme) : adjusterButtonSx(theme)
+            }
           >
-            <RemoveIcon />
+            <RemoveIcon fontSize={compact ? "small" : "medium"} />
           </IconButton>
         )}
         <Typography
-          variant="h6"
-          sx={{ minWidth: 28, textAlign: "center", color }}
+          variant={compact ? "body1" : "h6"}
+          color={compact ? "text.secondary" : undefined}
+          sx={{ minWidth: compact ? 20 : 28, textAlign: "center", color }}
           fontWeight={outcome && outcome !== "par" ? 700 : undefined}
         >
           {recorded ? value : "-"}
@@ -83,9 +111,11 @@ export function ScoreAdjuster({
           <IconButton
             aria-label={`increase ${label.toLowerCase()}`}
             onClick={onIncrement}
-            sx={adjusterButtonSx(theme)}
+            sx={
+              compact ? compactAdjusterButtonSx(theme) : adjusterButtonSx(theme)
+            }
           >
-            <AddIcon />
+            <AddIcon fontSize={compact ? "small" : "medium"} />
           </IconButton>
         )}
       </Box>

@@ -90,7 +90,11 @@ export function HoleStepView({
               </ToggleButtonGroup>
             )}
 
-            <Stack direction="row" spacing={6}>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="flex-start"
+            >
               <ScoreAdjuster
                 label="Strokes"
                 value={score.strokes}
@@ -106,6 +110,7 @@ export function HoleStepView({
                 value={score.penalties}
                 min={0}
                 readOnly={isCompleted}
+                size="compact"
                 onDecrement={() => void adjust(score.id, "penalties", -1)}
                 onIncrement={() => void adjust(score.id, "penalties", 1)}
               />
