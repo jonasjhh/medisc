@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import type { RoundDetail } from "./api";
+import { ShareRoundDialog } from "./ShareRoundDialog";
 
 export function RoundHeader({
   round,
@@ -20,6 +22,8 @@ export function RoundHeader({
   onFinish: () => Promise<void>;
   onReopen: () => Promise<void>;
 }) {
+  const [shareOpen, setShareOpen] = useState(false);
+
   return (
     <>
       <Button component={RouterLink} to="/rounds" sx={{ mb: 2 }}>
@@ -43,6 +47,13 @@ export function RoundHeader({
             <Button
               size="small"
               variant="outlined"
+              onClick={() => setShareOpen(true)}
+            >
+              Share
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
               disabled={reopening}
               onClick={() => void onReopen()}
             >
@@ -60,6 +71,14 @@ export function RoundHeader({
           </Button>
         )}
       </Stack>
+
+      {isCompleted && (
+        <ShareRoundDialog
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          round={round}
+        />
+      )}
     </>
   );
 }

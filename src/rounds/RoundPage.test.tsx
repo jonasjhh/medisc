@@ -464,6 +464,27 @@ describe("RoundPage", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows a Share button on a completed round", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+    });
+    renderPage();
+
+    expect(
+      await screen.findByRole("button", { name: "Share" }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not show a Share button on an in-progress round", async () => {
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    expect(
+      screen.queryByRole("button", { name: "Share" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("reaches the scorecard summary after the last hole and shows totals", async () => {
     const user = userEvent.setup();
     renderPage();
