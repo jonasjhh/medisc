@@ -248,6 +248,9 @@ describe("RoundPage", () => {
     expect(
       screen.queryByRole("button", { name: /increase strokes/i }),
     ).not.toBeInTheDocument();
+    // Managing players only matters while scores can still change, which
+    // isn't the case on a completed round until it's reopened.
+    expect(screen.queryByText("Players")).not.toBeInTheDocument();
   });
 
   it("toggles the counting flag", async () => {
@@ -356,6 +359,7 @@ describe("RoundPage", () => {
     expect(
       screen.getByRole("button", { name: /increase strokes/i }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Players")).toBeInTheDocument();
   });
 
   it("sets strokes to par with the quick-score buttons", async () => {

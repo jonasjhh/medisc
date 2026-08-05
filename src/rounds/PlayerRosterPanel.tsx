@@ -18,12 +18,10 @@ import type { RoundDetail, RoundPlayer } from "./api";
 
 export function PlayerRosterPanel({
   round,
-  isCompleted,
   onRoundUpdated,
   onError,
 }: {
   round: RoundDetail;
-  isCompleted: boolean;
   onRoundUpdated: (round: RoundDetail) => void;
   onError: (message: string | null) => void;
 }) {
@@ -121,7 +119,7 @@ export function PlayerRosterPanel({
           <Typography variant="subtitle1" fontWeight={600}>
             Players
           </Typography>
-          {!isCompleted && !editingPlayers && (
+          {!editingPlayers && (
             <Button size="small" onClick={startEditingPlayers}>
               Manage players
             </Button>
@@ -168,31 +166,29 @@ export function PlayerRosterPanel({
                 alignItems="center"
               >
                 <Typography color="text.secondary">{player.name}</Typography>
-                {!isCompleted && (
-                  <Tooltip
-                    title={
-                      playersNotInRound.length === 0
-                        ? "No other players to swap in"
-                        : `Swap ${player.name} for another player`
-                    }
-                  >
-                    <span>
-                      <IconButton
-                        size="small"
-                        aria-label={`swap ${player.name}`}
-                        disabled={playersNotInRound.length === 0 || swapping}
-                        onClick={(event) =>
-                          setSwapMenu({
-                            anchorEl: event.currentTarget,
-                            player,
-                          })
-                        }
-                      >
-                        <SwapHorizIcon fontSize="small" />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                )}
+                <Tooltip
+                  title={
+                    playersNotInRound.length === 0
+                      ? "No other players to swap in"
+                      : `Swap ${player.name} for another player`
+                  }
+                >
+                  <span>
+                    <IconButton
+                      size="small"
+                      aria-label={`swap ${player.name}`}
+                      disabled={playersNotInRound.length === 0 || swapping}
+                      onClick={(event) =>
+                        setSwapMenu({
+                          anchorEl: event.currentTarget,
+                          player,
+                        })
+                      }
+                    >
+                      <SwapHorizIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
               </Stack>
             ))}
           </Stack>

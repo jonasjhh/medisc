@@ -92,12 +92,13 @@ export function RoundPage() {
         onToggle={data.handleToggleCounting}
       />
 
-      <PlayerRosterPanel
-        round={round}
-        isCompleted={isCompleted}
-        onRoundUpdated={data.setRound}
-        onError={data.setError}
-      />
+      {!isCompleted && (
+        <PlayerRosterPanel
+          round={round}
+          onRoundUpdated={data.setRound}
+          onError={data.setError}
+        />
+      )}
 
       <RoundStepHeader
         step={step}
