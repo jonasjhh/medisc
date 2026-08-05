@@ -85,6 +85,11 @@ describe("buildShareCardData", () => {
     ]);
   });
 
+  it("carries each hole's distance through", () => {
+    const data = buildShareCardData(baseRound);
+    expect(data.holes.map((h) => h.distanceMeters)).toEqual([90, 120]);
+  });
+
   it("includes course, layout, and formatted date", () => {
     const data = buildShareCardData(baseRound);
     expect(data.courseName).toBe("Maple Hill");
@@ -172,18 +177,64 @@ describe("drawShareCard", () => {
     vi.restoreAllMocks();
   });
 
-  it("draws the full card and every player card without throwing", () => {
+  it("draws the full card and every player card without throwing, in both modes", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
       fakeContext as unknown as CanvasRenderingContext2D,
     );
     const canvas = document.createElement("canvas");
     const data = buildShareCardData(baseRound);
 
-    for (const kind of listShareCards(data)) {
-      fakeContext.fillText.mockClear();
-      expect(() => drawShareCard(canvas, kind, data)).not.toThrow();
-      expect(fakeContext.fillText).toHaveBeenCalled();
+    for (const mode of ["light", "dark"] as const) {
+      for (const kind of listShareCards(data)) {
+        fakeContext.fillText.mockClear();
+        expect(() => drawShareCard(canvas, kind, data, mode)).not.toThrow();
+        expect(fakeContext.fillText).toHaveBeenCalled();
+      }
     }
+  });
+
+  it("shows the course's total length and par in the full card header", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      fakeContext as unknown as CanvasRenderingContext2D,
+    );
+    const canvas = document.createElement("canvas");
+    const data = buildShareCardData(baseRound);
+
+    drawShareCard(canvas, { type: "full" }, data, "light");
+
+    const drawnText = fakeContext.fillText.mock.calls.map((call) => call[0]);
+    // 90 + 120 meters, and par 3 + 4.
+    expect(drawnText).toContain("210m");
+    expect(drawnText).toContain("7");
+  });
+
+  it("falls back to a plain TOT label when no hole has a recorded distance", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      fakeContext as unknown as CanvasRenderingContext2D,
+    );
+    const canvas = document.createElement("canvas");
+    const data = buildShareCardData({
+      ...baseRound,
+      holes: baseRound.holes.map((h) => ({ ...h, distanceMeters: null })),
+    });
+
+    drawShareCard(canvas, { type: "full" }, data, "light");
+
+    const drawnText = fakeContext.fillText.mock.calls.map((call) => call[0]);
+    expect(drawnText).toContain("TOT");
+  });
+
+  it("sizes the canvas identically regardless of mode", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      fakeContext as unknown as CanvasRenderingContext2D,
+    );
+    const canvas = document.createElement("canvas");
+    const data = buildShareCardData(baseRound);
+
+    drawShareCard(canvas, { type: "full" }, data, "light");
+    const lightSize = { width: canvas.width, height: canvas.height };
+    drawShareCard(canvas, { type: "full" }, data, "dark");
+    expect({ width: canvas.width, height: canvas.height }).toEqual(lightSize);
   });
 
   it("does nothing when the canvas has no 2d context", () => {
@@ -191,7 +242,9 @@ describe("drawShareCard", () => {
     const canvas = document.createElement("canvas");
     const data = buildShareCardData(baseRound);
 
-    expect(() => drawShareCard(canvas, { type: "full" }, data)).not.toThrow();
+    expect(() =>
+      drawShareCard(canvas, { type: "full" }, data, "dark"),
+    ).not.toThrow();
   });
 });
 

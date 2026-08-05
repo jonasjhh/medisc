@@ -1,7 +1,9 @@
 import type { RoundDetail } from "./api";
 import { formatDateTime } from "../shared/formatDateTime";
-import { badgeColors, scoreOutcome } from "./scoreColor";
+import { adjusterTextColors, badgeColors, scoreOutcome } from "./scoreColor";
 import { formatWeather } from "./weather";
+
+export type CardMode = "light" | "dark";
 
 // Mirrors udisc's "share scorecard" sheet: one card holding the full
 // scorecard for every player, then one stats card per player. Not a fixed
@@ -33,6 +35,7 @@ export function shareCardLabel(
 export interface ShareCardHole {
   number: number;
   par: number;
+  distanceMeters: number | null;
 }
 
 export interface ShareCardPlayerScore {
@@ -80,6 +83,22 @@ function weatherEmoji(symbolCode: string | null): string {
   return "☁️";
 }
 
+// Course-level totals (not any one player's) — null-tolerant on distance the
+// same way CoursesPage's layoutTotals() is, since older holes may have no
+// recorded length.
+function courseTotals(holes: ShareCardHole[]): {
+  totalPar: number;
+  totalMeters: number | null;
+} {
+  const totalPar = holes.reduce((sum, h) => sum + h.par, 0);
+  const knownDistances = holes.filter((h) => h.distanceMeters !== null);
+  const totalMeters =
+    knownDistances.length > 0
+      ? knownDistances.reduce((sum, h) => sum + (h.distanceMeters ?? 0), 0)
+      : null;
+  return { totalPar, totalMeters };
+}
+
 function relativeToPar(total: number, par: number): string {
   const diff = total - par;
   if (diff === 0) {
@@ -91,7 +110,11 @@ function relativeToPar(total: number, par: number): string {
 export function buildShareCardData(round: RoundDetail): ShareCardData {
   const sortedHoles = [...round.holes].sort((a, b) => a.number - b.number);
   const holeNumberById = new Map(sortedHoles.map((h) => [h.id, h.number]));
-  const holes = sortedHoles.map((h) => ({ number: h.number, par: h.par }));
+  const holes = sortedHoles.map((h) => ({
+    number: h.number,
+    par: h.par,
+    distanceMeters: h.distanceMeters,
+  }));
 
   const players = round.players
     .map((player) => {
@@ -146,20 +169,48 @@ function truncateToWidth(
   return `${truncated}…`;
 }
 
-const BRAND = {
-  green: "#2e6e4e",
-  greenLight: "#7bc99a",
-  dark: "#121212",
-  panel: "#1e1e1e",
-  divider: "#333a30",
-  ink: "#f2f4ef",
-  mutedInk: "#9aa79c",
+interface Palette {
+  background: string;
+  panel: string;
+  divider: string;
+  ink: string;
+  mutedInk: string;
+  green: string;
+  accentText: string; // text-safe green (under-par scores, winner highlight)
+}
+
+// accentText reuses adjusterTextColors.birdie — it's already tuned per mode
+// as plain foreground text (not a badge fill), which is exactly this use.
+const PALETTES: Record<CardMode, Palette> = {
+  dark: {
+    background: "#121212",
+    panel: "#1e1e1e",
+    divider: "#333a30",
+    ink: "#f2f4ef",
+    mutedInk: "#9aa79c",
+    green: "#2e6e4e",
+    accentText: adjusterTextColors.birdie.dark,
+  },
+  light: {
+    background: "#f6f7f5",
+    panel: "#ffffff",
+    divider: "#d8ddd4",
+    ink: "#1a2117",
+    mutedInk: "#55624f",
+    green: "#2e6e4e",
+    accentText: adjusterTextColors.birdie.light,
+  },
 };
 
 export const CARD_WIDTH = 1080;
 const MARGIN_X = 56;
 const TOT_COL_WIDTH = 108;
-const FOOTER_HEIGHT = 96;
+const FOOTER_HEIGHT = 76;
+// Breathing room between the last row of content and the footer bar —
+// without this the footer sits flush against (or overlapping) the score
+// row, since the card height was previously eyeballed instead of derived
+// from where drawing actually ends.
+const FOOTER_GAP = 28;
 
 // Hole columns shrink to fit however many holes the round has, so an
 // 18-hole layout and a 9-hole one both render as one row instead of
@@ -169,69 +220,110 @@ function holeColWidth(holeCount: number, labelColWidth: number): number {
   return Math.max(30, available / Math.max(1, holeCount));
 }
 
+// Unscaled y-positions for the full card — the single source of truth for
+// both getCardSize() (how tall the card needs to be) and drawFullCard()
+// (where things actually get drawn), so the two can't drift apart.
+function fullCardLayout(playerCount: number) {
+  const headerY = 230;
+  const parY = headerY + 30;
+  const dividerY = parY + 16;
+  const rowHeight = 62;
+  const firstRowY = dividerY + rowHeight / 2 + 16;
+  const lastRowBottom =
+    firstRowY + Math.max(0, playerCount - 1) * rowHeight + rowHeight / 2;
+  return {
+    headerY,
+    parY,
+    dividerY,
+    rowHeight,
+    firstRowY,
+    contentBottom: lastRowBottom + FOOTER_GAP,
+  };
+}
+
+// Unscaled y-positions for a player card — see fullCardLayout().
+function playerCardLayout() {
+  const statsY = 210;
+  const donutR = 44;
+  const holeLabelWidth = 84;
+  const holeSectionY = statsY + donutR * 2 + 70;
+  const parRowY = holeSectionY + 30;
+  const scoreRowY = parRowY + 46;
+  const badgeRadius = 22;
+  return {
+    statsY,
+    donutR,
+    holeLabelWidth,
+    holeSectionY,
+    parRowY,
+    scoreRowY,
+    contentBottom: scoreRowY + badgeRadius + FOOTER_GAP,
+  };
+}
+
 function drawFooter(
   ctx: CanvasRenderingContext2D,
   data: ShareCardData,
-  s: number,
+  palette: Palette,
   y: number,
 ) {
-  const height = FOOTER_HEIGHT * s;
-  const gradient = ctx.createLinearGradient(0, y, CARD_WIDTH * s, y);
-  gradient.addColorStop(0, BRAND.green);
+  const gradient = ctx.createLinearGradient(0, y, CARD_WIDTH, y);
+  gradient.addColorStop(0, palette.green);
   gradient.addColorStop(1, "#1d4b34");
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, y, CARD_WIDTH * s, height);
+  ctx.fillRect(0, y, CARD_WIDTH, FOOTER_HEIGHT);
 
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.font = `600 ${26 * s}px system-ui, sans-serif`;
+  ctx.font = "600 26px system-ui, sans-serif";
   const left = [data.dateLabel, data.weatherLabel]
     .filter(Boolean)
     .join("  ·  ");
-  ctx.fillText(left, MARGIN_X * s, y + height / 2);
+  ctx.fillText(left, MARGIN_X, y + FOOTER_HEIGHT / 2);
 
   ctx.textAlign = "right";
-  ctx.font = `700 ${30 * s}px system-ui, sans-serif`;
-  ctx.fillText("MEDISC", CARD_WIDTH * s - MARGIN_X * s, y + height / 2);
+  ctx.font = "700 30px system-ui, sans-serif";
+  ctx.fillText("MEDISC", CARD_WIDTH - MARGIN_X, y + FOOTER_HEIGHT / 2);
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
 }
 
 function drawScoreBadge(
   ctx: CanvasRenderingContext2D,
+  palette: Palette,
+  mode: CardMode,
   centerX: number,
   centerY: number,
   diameter: number,
   strokes: number,
   par: number,
   recorded: boolean,
-  s: number,
 ) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   if (!recorded) {
-    ctx.fillStyle = BRAND.mutedInk;
+    ctx.fillStyle = palette.mutedInk;
     ctx.font = `${Math.max(16, diameter * 0.5)}px system-ui, sans-serif`;
-    ctx.fillText("–", centerX, centerY + 1 * s);
+    ctx.fillText("–", centerX, centerY + 1);
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
     return;
   }
   const outcome = scoreOutcome(strokes, par);
   if (outcome === "par") {
-    ctx.fillStyle = BRAND.ink;
+    ctx.fillStyle = palette.ink;
     ctx.font = `600 ${Math.max(16, diameter * 0.52)}px system-ui, sans-serif`;
-    ctx.fillText(`${strokes}`, centerX, centerY + 1 * s);
+    ctx.fillText(`${strokes}`, centerX, centerY + 1);
   } else {
-    const colors = badgeColors[outcome].dark;
+    const colors = badgeColors[outcome][mode];
     ctx.fillStyle = colors.background;
     ctx.beginPath();
     ctx.arc(centerX, centerY, diameter / 2, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = colors.text;
     ctx.font = `700 ${Math.max(16, diameter * 0.5)}px system-ui, sans-serif`;
-    ctx.fillText(`${strokes}`, centerX, centerY + 1 * s);
+    ctx.fillText(`${strokes}`, centerX, centerY + 1);
   }
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
@@ -256,122 +348,136 @@ function drawHoleRow(
 function drawFullCard(
   ctx: CanvasRenderingContext2D,
   data: ShareCardData,
-  s: number,
+  palette: Palette,
+  mode: CardMode,
   height: number,
 ) {
-  ctx.fillStyle = BRAND.dark;
-  ctx.fillRect(0, 0, CARD_WIDTH * s, height * s);
+  ctx.fillStyle = palette.background;
+  ctx.fillRect(0, 0, CARD_WIDTH, height);
 
-  ctx.fillStyle = BRAND.mutedInk;
-  ctx.font = `${26 * s}px system-ui, sans-serif`;
-  ctx.fillText("Full scorecard", MARGIN_X * s, 70 * s);
+  ctx.fillStyle = palette.mutedInk;
+  ctx.font = "26px system-ui, sans-serif";
+  ctx.fillText("Full scorecard", MARGIN_X, 70);
 
-  ctx.fillStyle = BRAND.ink;
-  ctx.font = `700 ${48 * s}px system-ui, sans-serif`;
+  ctx.fillStyle = palette.ink;
+  ctx.font = "700 48px system-ui, sans-serif";
   ctx.fillText(
-    truncateToWidth(ctx, data.courseName, CARD_WIDTH * s - MARGIN_X * 2 * s),
-    MARGIN_X * s,
-    130 * s,
+    truncateToWidth(ctx, data.courseName, CARD_WIDTH - MARGIN_X * 2),
+    MARGIN_X,
+    130,
   );
-  ctx.fillStyle = BRAND.mutedInk;
-  ctx.font = `${28 * s}px system-ui, sans-serif`;
-  ctx.fillText(data.layoutName, MARGIN_X * s, 168 * s);
+  ctx.fillStyle = palette.mutedInk;
+  ctx.font = "28px system-ui, sans-serif";
+  ctx.fillText(data.layoutName, MARGIN_X, 168);
 
   const labelColWidth = 220;
-  const colWidth = holeColWidth(data.holes.length, labelColWidth) * s;
-  const startX = (MARGIN_X + labelColWidth) * s;
-  const totX = startX + colWidth * data.holes.length + (TOT_COL_WIDTH / 2) * s;
+  const colWidth = holeColWidth(data.holes.length, labelColWidth);
+  const startX = MARGIN_X + labelColWidth;
+  const totX = startX + colWidth * data.holes.length + TOT_COL_WIDTH / 2;
 
-  const headerY = 230 * s;
-  ctx.fillStyle = BRAND.mutedInk;
-  ctx.font = `${18 * s}px system-ui, sans-serif`;
+  const { totalPar, totalMeters } = courseTotals(data.holes);
+
+  const layout = fullCardLayout(data.players.length);
+  ctx.fillStyle = palette.mutedInk;
+  ctx.font = "18px system-ui, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("HOLE", MARGIN_X * s, headerY);
+  ctx.fillText("HOLE", MARGIN_X, layout.headerY);
   ctx.textAlign = "center";
-  drawHoleRow(data.holes, startX, headerY, colWidth, (hole, cx, cy) => {
+  drawHoleRow(data.holes, startX, layout.headerY, colWidth, (hole, cx, cy) => {
     ctx.fillText(`${hole.number}`, cx, cy);
   });
-  ctx.fillText("TOT", totX, headerY);
+  // The TOT column's header cells carry the course's own totals (length,
+  // par) rather than a plain "TOT" label — each player's own total sits
+  // below in their row, so this is the one place a course-wide figure fits.
+  ctx.fillText(
+    totalMeters !== null ? `${totalMeters}m` : "TOT",
+    totX,
+    layout.headerY,
+  );
 
-  const parY = headerY + 30 * s;
   ctx.textAlign = "left";
-  ctx.fillText("PAR", MARGIN_X * s, parY);
+  ctx.fillText("PAR", MARGIN_X, layout.parY);
   ctx.textAlign = "center";
-  drawHoleRow(data.holes, startX, parY, colWidth, (hole, cx, cy) => {
+  drawHoleRow(data.holes, startX, layout.parY, colWidth, (hole, cx, cy) => {
     ctx.fillText(`${hole.par}`, cx, cy);
   });
+  ctx.fillText(`${totalPar}`, totX, layout.parY);
 
-  ctx.strokeStyle = BRAND.divider;
-  ctx.lineWidth = 2 * s;
+  ctx.strokeStyle = palette.divider;
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(MARGIN_X * s, parY + 16 * s);
-  ctx.lineTo(CARD_WIDTH * s - MARGIN_X * s, parY + 16 * s);
+  ctx.moveTo(MARGIN_X, layout.dividerY);
+  ctx.lineTo(CARD_WIDTH - MARGIN_X, layout.dividerY);
   ctx.stroke();
 
-  const rowHeight = 62 * s;
-  const badgeDiameter = Math.min(colWidth * 0.7, 40 * s);
-  const firstRowY = parY + 16 * s + rowHeight / 2 + 16 * s;
+  const badgeDiameter = Math.min(colWidth * 0.7, 40);
 
   data.players.forEach((player, index) => {
-    const rowY = firstRowY + index * rowHeight;
+    const rowY = layout.firstRowY + index * layout.rowHeight;
     if (index === 0) {
-      ctx.fillStyle = BRAND.panel;
-      ctx.fillRect(0, rowY - rowHeight / 2, CARD_WIDTH * s, rowHeight);
+      ctx.fillStyle = palette.panel;
+      ctx.fillRect(
+        0,
+        rowY - layout.rowHeight / 2,
+        CARD_WIDTH,
+        layout.rowHeight,
+      );
     }
 
     ctx.textAlign = "left";
-    ctx.fillStyle = index === 0 ? BRAND.greenLight : BRAND.ink;
-    ctx.font = `600 ${26 * s}px system-ui, sans-serif`;
+    ctx.fillStyle = index === 0 ? palette.accentText : palette.ink;
+    ctx.font = "600 26px system-ui, sans-serif";
     ctx.fillText(
-      truncateToWidth(ctx, player.name, labelColWidth * s - 16 * s),
-      MARGIN_X * s,
-      rowY + 8 * s,
+      truncateToWidth(ctx, player.name, labelColWidth - 16),
+      MARGIN_X,
+      rowY + 8,
     );
 
     drawHoleRow(data.holes, startX, rowY, colWidth, (hole, cx, cy) => {
       const score = player.scores[data.holes.indexOf(hole)];
       drawScoreBadge(
         ctx,
+        palette,
+        mode,
         cx,
         cy,
         badgeDiameter,
         score.strokes,
         hole.par,
         score.recorded,
-        s,
       );
     });
 
     ctx.textAlign = "center";
-    ctx.fillStyle = BRAND.ink;
-    ctx.font = `700 ${26 * s}px system-ui, sans-serif`;
-    ctx.fillText(`${player.total}`, totX, rowY - 6 * s);
-    ctx.fillStyle = BRAND.mutedInk;
-    ctx.font = `${18 * s}px system-ui, sans-serif`;
-    ctx.fillText(relativeToPar(player.total, player.par), totX, rowY + 16 * s);
+    ctx.fillStyle = palette.ink;
+    ctx.font = "700 26px system-ui, sans-serif";
+    ctx.fillText(`${player.total}`, totX, rowY - 6);
+    ctx.fillStyle = palette.mutedInk;
+    ctx.font = "18px system-ui, sans-serif";
+    ctx.fillText(relativeToPar(player.total, player.par), totX, rowY + 16);
     ctx.textAlign = "left";
   });
 
-  drawFooter(ctx, data, s, height * s - FOOTER_HEIGHT * s);
+  drawFooter(ctx, data, palette, layout.contentBottom);
 }
 
 function drawSegmentedBar(
   ctx: CanvasRenderingContext2D,
+  palette: Palette,
   x: number,
   y: number,
   width: number,
   height: number,
   segments: { count: number; color: string }[],
-  s: number,
 ) {
   const total = segments.reduce((sum, seg) => sum + seg.count, 0);
   if (total === 0) {
-    ctx.fillStyle = BRAND.divider;
+    ctx.fillStyle = palette.divider;
     ctx.fillRect(x, y, width, height);
     return;
   }
   let cursor = x;
-  const gap = 3 * s;
+  const gap = 3;
   segments.forEach((seg) => {
     if (seg.count === 0) {
       return;
@@ -379,15 +485,11 @@ function drawSegmentedBar(
     const segWidth = (seg.count / total) * width;
     ctx.fillStyle = seg.color;
     ctx.fillRect(cursor, y, Math.max(0, segWidth - gap), height);
-    if (segWidth > 30 * s) {
+    if (segWidth > 30) {
       ctx.fillStyle = "#121212";
       ctx.textAlign = "center";
-      ctx.font = `700 ${16 * s}px system-ui, sans-serif`;
-      ctx.fillText(
-        `${seg.count}`,
-        cursor + segWidth / 2,
-        y + height / 2 + 5 * s,
-      );
+      ctx.font = "700 16px system-ui, sans-serif";
+      ctx.fillText(`${seg.count}`, cursor + segWidth / 2, y + height / 2 + 5);
       ctx.textAlign = "left";
     }
     cursor += segWidth;
@@ -398,43 +500,44 @@ function drawPlayerCard(
   ctx: CanvasRenderingContext2D,
   data: ShareCardData,
   playerIndex: number,
-  s: number,
+  palette: Palette,
+  mode: CardMode,
   height: number,
 ) {
   const player = data.players[playerIndex];
 
-  ctx.fillStyle = BRAND.dark;
-  ctx.fillRect(0, 0, CARD_WIDTH * s, height * s);
+  ctx.fillStyle = palette.background;
+  ctx.fillRect(0, 0, CARD_WIDTH, height);
 
-  const avatarR = 44 * s;
-  const avatarCx = (MARGIN_X + 44) * s;
-  const avatarCy = 110 * s;
-  ctx.fillStyle = BRAND.green;
+  const avatarR = 44;
+  const avatarCx = MARGIN_X + avatarR;
+  const avatarCy = 110;
+  ctx.fillStyle = palette.green;
   ctx.beginPath();
   ctx.arc(avatarCx, avatarCy, avatarR, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `700 ${44 * s}px system-ui, sans-serif`;
-  ctx.fillText(player.name.charAt(0).toUpperCase(), avatarCx, avatarCy + 2 * s);
+  ctx.font = "700 44px system-ui, sans-serif";
+  ctx.fillText(player.name.charAt(0).toUpperCase(), avatarCx, avatarCy + 2);
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
 
-  const textX = (MARGIN_X + 44 + 60) * s;
-  ctx.fillStyle = BRAND.ink;
-  ctx.font = `700 ${36 * s}px system-ui, sans-serif`;
+  const textX = MARGIN_X + avatarR * 2 + 32;
+  ctx.fillStyle = palette.ink;
+  ctx.font = "700 36px system-ui, sans-serif";
   ctx.fillText(
-    truncateToWidth(ctx, player.name, CARD_WIDTH * s - textX - 260 * s),
+    truncateToWidth(ctx, player.name, CARD_WIDTH - textX - 260),
     textX,
-    avatarCy - 6 * s,
+    avatarCy - 6,
   );
-  ctx.fillStyle = BRAND.mutedInk;
-  ctx.font = `${26 * s}px system-ui, sans-serif`;
+  ctx.fillStyle = palette.mutedInk;
+  ctx.font = "26px system-ui, sans-serif";
   ctx.fillText(
-    truncateToWidth(ctx, data.courseName, CARD_WIDTH * s - textX - 260 * s),
+    truncateToWidth(ctx, data.courseName, CARD_WIDTH - textX - 260),
     textX,
-    avatarCy + 30 * s,
+    avatarCy + 30,
   );
 
   const diff = player.total - player.par;
@@ -442,15 +545,15 @@ function drawPlayerCard(
   ctx.textAlign = "right";
   ctx.fillStyle =
     diff < 0
-      ? BRAND.greenLight
+      ? palette.accentText
       : diff > 0
-        ? badgeColors.bogey.dark.background
-        : BRAND.ink;
-  ctx.font = `700 ${52 * s}px system-ui, sans-serif`;
+        ? adjusterTextColors.bogey[mode]
+        : palette.ink;
+  ctx.font = "700 52px system-ui, sans-serif";
   ctx.fillText(
     `${scoreDiff} (${player.total})`,
-    CARD_WIDTH * s - MARGIN_X * s,
-    avatarCy + 8 * s,
+    CARD_WIDTH - MARGIN_X,
+    avatarCy + 8,
   );
   ctx.textAlign = "left";
 
@@ -466,138 +569,152 @@ function drawPlayerCard(
     ? Math.round((under / outcomes.length) * 100)
     : 0;
 
-  const statsY = 210 * s;
-  const donutR = 44 * s;
+  const layout = playerCardLayout();
   ctx.save();
-  ctx.translate(MARGIN_X * s + donutR, statsY + donutR);
-  ctx.lineWidth = 8 * s;
-  ctx.strokeStyle = BRAND.divider;
+  ctx.translate(MARGIN_X + layout.donutR, layout.statsY + layout.donutR);
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = palette.divider;
   ctx.beginPath();
-  ctx.arc(0, 0, donutR - 4 * s, 0, Math.PI * 2);
+  ctx.arc(0, 0, layout.donutR - 4, 0, Math.PI * 2);
   ctx.stroke();
   if (birdiePct > 0) {
-    ctx.strokeStyle = BRAND.greenLight;
+    ctx.strokeStyle = palette.accentText;
     ctx.beginPath();
     ctx.arc(
       0,
       0,
-      donutR - 4 * s,
+      layout.donutR - 4,
       -Math.PI / 2,
       -Math.PI / 2 + (birdiePct / 100) * Math.PI * 2,
     );
     ctx.stroke();
   }
-  ctx.fillStyle = BRAND.ink;
-  ctx.font = `700 ${20 * s}px system-ui, sans-serif`;
+  ctx.fillStyle = palette.ink;
+  ctx.font = "700 20px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(`${birdiePct}%`, 0, 0);
   ctx.restore();
 
-  ctx.fillStyle = BRAND.mutedInk;
-  ctx.font = `${20 * s}px system-ui, sans-serif`;
+  ctx.fillStyle = palette.mutedInk;
+  ctx.font = "20px system-ui, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("BIRDIES", MARGIN_X * s + donutR, statsY + donutR * 2 + 26 * s);
+  ctx.fillText(
+    "BIRDIES",
+    MARGIN_X + layout.donutR,
+    layout.statsY + layout.donutR * 2 + 26,
+  );
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
 
-  const barX = (MARGIN_X + donutR * 2 + 32) * s;
-  const barWidth = CARD_WIDTH * s - barX - MARGIN_X * s;
+  const barX = MARGIN_X + layout.donutR * 2 + 32;
+  const barWidth = CARD_WIDTH - barX - MARGIN_X;
   drawSegmentedBar(
     ctx,
+    palette,
     barX,
-    statsY + donutR - 14 * s,
+    layout.statsY + layout.donutR - 14,
     barWidth,
-    28 * s,
+    28,
     [
-      { count: under, color: badgeColors.birdie.dark.background },
-      { count: par, color: BRAND.divider },
-      { count: over, color: badgeColors.bogey.dark.background },
+      { count: under, color: badgeColors.birdie[mode].background },
+      { count: par, color: palette.divider },
+      { count: over, color: badgeColors.bogey[mode].background },
     ],
-    s,
   );
 
-  const holeLabelWidth = 84;
-  const holeSectionY = statsY + donutR * 2 + 70 * s;
-  const colWidth = holeColWidth(data.holes.length, holeLabelWidth) * s;
-  const startX = (MARGIN_X + holeLabelWidth) * s;
+  const colWidth = holeColWidth(data.holes.length, layout.holeLabelWidth);
+  const startX = MARGIN_X + layout.holeLabelWidth;
 
-  ctx.fillStyle = BRAND.mutedInk;
-  ctx.font = `${18 * s}px system-ui, sans-serif`;
+  ctx.fillStyle = palette.mutedInk;
+  ctx.font = "18px system-ui, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("HOLE", MARGIN_X * s, holeSectionY);
+  ctx.fillText("HOLE", MARGIN_X, layout.holeSectionY);
   ctx.textAlign = "center";
-  drawHoleRow(data.holes, startX, holeSectionY, colWidth, (hole, cx, cy) =>
-    ctx.fillText(`${hole.number}`, cx, cy),
+  drawHoleRow(
+    data.holes,
+    startX,
+    layout.holeSectionY,
+    colWidth,
+    (hole, cx, cy) => ctx.fillText(`${hole.number}`, cx, cy),
   );
 
-  const parRowY = holeSectionY + 30 * s;
   ctx.textAlign = "left";
-  ctx.fillText("PAR", MARGIN_X * s, parRowY);
+  ctx.fillText("PAR", MARGIN_X, layout.parRowY);
   ctx.textAlign = "center";
-  drawHoleRow(data.holes, startX, parRowY, colWidth, (hole, cx, cy) =>
+  drawHoleRow(data.holes, startX, layout.parRowY, colWidth, (hole, cx, cy) =>
     ctx.fillText(`${hole.par}`, cx, cy),
   );
 
-  const scoreRowY = parRowY + 46 * s;
-  const badgeDiameter = Math.min(colWidth * 0.72, 44 * s);
-  drawHoleRow(data.holes, startX, scoreRowY, colWidth, (hole, cx, cy) => {
-    const score = player.scores[data.holes.indexOf(hole)];
-    drawScoreBadge(
-      ctx,
-      cx,
-      cy,
-      badgeDiameter,
-      score.strokes,
-      hole.par,
-      score.recorded,
-      s,
-    );
-  });
+  const badgeDiameter = Math.min(colWidth * 0.72, 44);
+  drawHoleRow(
+    data.holes,
+    startX,
+    layout.scoreRowY,
+    colWidth,
+    (hole, cx, cy) => {
+      const score = player.scores[data.holes.indexOf(hole)];
+      drawScoreBadge(
+        ctx,
+        palette,
+        mode,
+        cx,
+        cy,
+        badgeDiameter,
+        score.strokes,
+        hole.par,
+        score.recorded,
+      );
+    },
+  );
 
-  drawFooter(ctx, data, s, height * s - FOOTER_HEIGHT * s);
+  drawFooter(ctx, data, palette, layout.contentBottom);
 }
 
-// Natural (unscaled, CARD_WIDTH-relative) card size. The full card grows
-// with player count (one row each); a player card is a near-fixed height
-// regardless of roster size, since it only ever shows one row of holes.
+// Card size in CSS/canvas pixels — every draw function above works in
+// these same absolute units (no scale factor), so the on-screen preview
+// and the shared/downloaded image are always the identical bitmap, just
+// displayed at different CSS sizes. That's what guarantees they match:
+// there's only one rendering, never two independently-scaled ones.
 export function getCardSize(
   kind: ShareCardKind,
   data: ShareCardData,
 ): { width: number; height: number } {
   if (kind.type === "full") {
-    const headerHeight = 260;
-    const rowHeight = 62;
-    const height =
-      headerHeight + data.players.length * rowHeight + FOOTER_HEIGHT + 20;
-    return { width: CARD_WIDTH, height: Math.max(400, Math.round(height)) };
+    return {
+      width: CARD_WIDTH,
+      height: Math.max(
+        400,
+        Math.round(
+          fullCardLayout(data.players.length).contentBottom + FOOTER_HEIGHT,
+        ),
+      ),
+    };
   }
-  return { width: CARD_WIDTH, height: 560 };
+  return {
+    width: CARD_WIDTH,
+    height: Math.round(playerCardLayout().contentBottom + FOOTER_HEIGHT),
+  };
 }
 
-// width lets callers render the identical design at any resolution (a
-// small live thumbnail vs. the full-size shareable image) from one source
-// of truth — every metric above is authored for CARD_WIDTH and scaled by
-// width / CARD_WIDTH; height follows from getCardSize().
 export function drawShareCard(
   canvas: HTMLCanvasElement,
   kind: ShareCardKind,
   data: ShareCardData,
-  width: number = CARD_WIDTH,
+  mode: CardMode,
 ) {
-  const natural = getCardSize(kind, data);
-  const scale = width / natural.width;
-  const height = Math.round(natural.height * scale);
-  canvas.width = width;
-  canvas.height = height;
+  const size = getCardSize(kind, data);
+  canvas.width = size.width;
+  canvas.height = size.height;
   const ctx = canvas.getContext("2d");
   if (!ctx) {
     return;
   }
+  const palette = PALETTES[mode];
   if (kind.type === "full") {
-    drawFullCard(ctx, data, scale, natural.height);
+    drawFullCard(ctx, data, palette, mode, size.height);
   } else {
-    drawPlayerCard(ctx, data, kind.index, scale, natural.height);
+    drawPlayerCard(ctx, data, kind.index, palette, mode, size.height);
   }
 }
 

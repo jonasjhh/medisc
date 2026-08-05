@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RoundPage } from "./RoundPage";
 import * as playersApi from "../players/api";
 import * as roundsApi from "./api";
+import { ThemeModeProvider } from "../app/ThemeModeContext";
 
 vi.mock("../players/api");
 vi.mock("./api");
@@ -69,15 +70,17 @@ const twelveHoleRound: roundsApi.RoundDetail = {
 
 function renderPage() {
   return render(
-    <MemoryRouter
-      initialEntries={["/rounds/1"]}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-    >
-      <Routes>
-        <Route path="/rounds" element={<div>Rounds list page</div>} />
-        <Route path="/rounds/:roundId" element={<RoundPage />} />
-      </Routes>
-    </MemoryRouter>,
+    <ThemeModeProvider>
+      <MemoryRouter
+        initialEntries={["/rounds/1"]}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <Routes>
+          <Route path="/rounds" element={<div>Rounds list page</div>} />
+          <Route path="/rounds/:roundId" element={<RoundPage />} />
+        </Routes>
+      </MemoryRouter>
+    </ThemeModeProvider>,
   );
 }
 

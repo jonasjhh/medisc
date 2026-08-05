@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ShareRoundDialog } from "./ShareRoundDialog";
 import type { RoundDetail } from "./api";
+import { ThemeModeProvider } from "../app/ThemeModeContext";
 
 const round: RoundDetail = {
   id: 1,
@@ -70,6 +71,14 @@ function mockCanvas() {
   );
 }
 
+function renderDialog(props: { onClose: () => void; round: RoundDetail }) {
+  return render(
+    <ThemeModeProvider>
+      <ShareRoundDialog open onClose={props.onClose} round={props.round} />
+    </ThemeModeProvider>,
+  );
+}
+
 describe("ShareRoundDialog", () => {
   beforeEach(() => {
     mockCanvas();
@@ -86,7 +95,7 @@ describe("ShareRoundDialog", () => {
   });
 
   it("shows the full scorecard plus one card per player", () => {
-    render(<ShareRoundDialog open onClose={vi.fn()} round={round} />);
+    renderDialog({ onClose: vi.fn(), round });
 
     expect(
       screen.getByRole("img", { name: "Full scorecard preview" }),
@@ -108,7 +117,7 @@ describe("ShareRoundDialog", () => {
     });
     const onClose = vi.fn();
     const user = userEvent.setup();
-    render(<ShareRoundDialog open onClose={onClose} round={round} />);
+    renderDialog({ onClose, round });
 
     await user.click(
       screen.getByRole("button", { name: /alice scorecard preview/i }),
@@ -132,7 +141,7 @@ describe("ShareRoundDialog", () => {
       .mockImplementation(() => {});
     const onClose = vi.fn();
     const user = userEvent.setup();
-    render(<ShareRoundDialog open onClose={onClose} round={round} />);
+    renderDialog({ onClose, round });
 
     expect(screen.getByText(/pick a card to download/i)).toBeInTheDocument();
     await user.click(
@@ -153,7 +162,7 @@ describe("ShareRoundDialog", () => {
     });
     const onClose = vi.fn();
     const user = userEvent.setup();
-    render(<ShareRoundDialog open onClose={onClose} round={round} />);
+    renderDialog({ onClose, round });
 
     await user.click(
       screen.getByRole("button", { name: /full scorecard preview/i }),
@@ -172,7 +181,7 @@ describe("ShareRoundDialog", () => {
       canShare: () => true,
     });
     const user = userEvent.setup();
-    render(<ShareRoundDialog open onClose={vi.fn()} round={round} />);
+    renderDialog({ onClose: vi.fn(), round });
 
     await user.click(
       screen.getByRole("button", { name: /full scorecard preview/i }),
@@ -184,7 +193,7 @@ describe("ShareRoundDialog", () => {
   it("calls onClose when the close button is clicked", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
-    render(<ShareRoundDialog open onClose={onClose} round={round} />);
+    renderDialog({ onClose, round });
 
     await user.click(screen.getByRole("button", { name: /close/i }));
 

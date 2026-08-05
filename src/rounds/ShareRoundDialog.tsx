@@ -12,44 +12,43 @@ import {
   buildShareCardData,
   canvasToBlob,
   drawShareCard,
-  getCardSize,
   listShareCards,
   shareCardKey,
   shareCardLabel,
+  type CardMode,
   type ShareCardData,
   type ShareCardKind,
 } from "./shareCard";
+import { useThemeMode } from "../app/useThemeMode";
 
-const THUMBNAIL_WIDTH = 320;
-
+// Always draws at the card's native resolution, then relies on the
+// `style` width/height:auto below to shrink it for display — the preview
+// and the shared/downloaded image are the exact same bitmap this way,
+// never two independently-scaled renders that can drift apart.
 function ThumbnailCanvas({
   kind,
   label,
   data,
+  mode,
 }: {
   kind: ShareCardKind;
   label: string;
   data: ShareCardData;
+  mode: CardMode;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const size = getCardSize(kind, data);
-  const thumbnailHeight = Math.round(
-    (THUMBNAIL_WIDTH / size.width) * size.height,
-  );
 
   useEffect(() => {
     if (canvasRef.current) {
-      drawShareCard(canvasRef.current, kind, data, THUMBNAIL_WIDTH);
+      drawShareCard(canvasRef.current, kind, data, mode);
     }
-  }, [kind, data]);
+  }, [kind, data, mode]);
 
   return (
     <canvas
       ref={canvasRef}
       role="img"
       aria-label={`${label} preview`}
-      width={THUMBNAIL_WIDTH}
-      height={thumbnailHeight}
       style={{
         width: "100%",
         height: "auto",
@@ -100,6 +99,7 @@ export function ShareRoundDialog({
   onClose: () => void;
   round: RoundDetail;
 }) {
+  const { resolvedMode } = useThemeMode();
   const [sharingKey, setSharingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const data = buildShareCardData(round);
@@ -111,7 +111,7 @@ export function ShareRoundDialog({
     setSharingKey(shareCardKey(kind));
     try {
       const canvas = document.createElement("canvas");
-      drawShareCard(canvas, kind, data);
+      drawShareCard(canvas, kind, data, resolvedMode);
       const blob = await canvasToBlob(canvas);
       if (!blob) {
         setError("Couldn't render the image. Please try again.");
@@ -195,7 +195,12 @@ export function ShareRoundDialog({
                         },
                   }}
                 >
-                  <ThumbnailCanvas kind={kind} label={label} data={data} />
+                  <ThumbnailCanvas
+                    kind={kind}
+                    label={label}
+                    data={data}
+                    mode={resolvedMode}
+                  />
                   {isSharing && (
                     <Stack
                       alignItems="center"
