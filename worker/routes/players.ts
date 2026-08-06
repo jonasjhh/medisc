@@ -340,7 +340,8 @@ playersRoute.get("/:playerId/score-distribution", async (c) => {
     `SELECT
        CASE
          WHEN hole_scores.strokes = 1 THEN 'ace'
-         WHEN hole_scores.strokes <= holes.par - 2 THEN 'eagle'
+         WHEN hole_scores.strokes <= holes.par - 3 THEN 'albatross'
+         WHEN hole_scores.strokes = holes.par - 2 THEN 'eagle'
          WHEN hole_scores.strokes = holes.par - 1 THEN 'birdie'
          WHEN hole_scores.strokes = holes.par THEN 'par'
          WHEN hole_scores.strokes = holes.par + 1 THEN 'bogey'
@@ -361,6 +362,7 @@ playersRoute.get("/:playerId/score-distribution", async (c) => {
 
   const distribution: ScoreDistribution = {
     ace: 0,
+    albatross: 0,
     eagle: 0,
     birdie: 0,
     par: 0,

@@ -7,9 +7,13 @@ describe("scoreOutcome", () => {
     expect(scoreOutcome(1, 4)).toBe("ace");
   });
 
-  it("classifies 2 or more strokes under par as an eagle", () => {
+  it("classifies exactly 2 strokes under par as an eagle", () => {
     expect(scoreOutcome(2, 4)).toBe("eagle");
-    expect(scoreOutcome(2, 5)).toBe("eagle"); // 3 under still counts as eagle
+  });
+
+  it("classifies 3 or more strokes under par as an albatross", () => {
+    expect(scoreOutcome(2, 5)).toBe("albatross");
+    expect(scoreOutcome(3, 7)).toBe("albatross"); // 4 under still counts
   });
 
   it("classifies 1 stroke under par as a birdie", () => {

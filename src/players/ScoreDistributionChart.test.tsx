@@ -7,12 +7,13 @@ import type { ScoreDistribution } from "./api";
 // getByText without colliding with another bucket's count.
 const distribution: ScoreDistribution = {
   ace: 1,
-  eagle: 2,
-  birdie: 3,
-  par: 4,
-  bogey: 5,
-  doubleBogey: 6,
-  worse: 7,
+  albatross: 2,
+  eagle: 3,
+  birdie: 4,
+  par: 5,
+  bogey: 6,
+  doubleBogey: 7,
+  worse: 8,
 };
 
 describe("ScoreDistributionChart", () => {
@@ -20,6 +21,7 @@ describe("ScoreDistributionChart", () => {
     render(<ScoreDistributionChart distribution={distribution} />);
 
     expect(screen.getByText("Ace")).toBeInTheDocument();
+    expect(screen.getByText("Albatross")).toBeInTheDocument();
     expect(screen.getByText("Eagle")).toBeInTheDocument();
     expect(screen.getByText("Birdie")).toBeInTheDocument();
     expect(screen.getByText("Par")).toBeInTheDocument();
@@ -31,20 +33,21 @@ describe("ScoreDistributionChart", () => {
   it("shows the percentage share and count for each bucket", () => {
     render(<ScoreDistributionChart distribution={distribution} />);
 
-    // Total is 28 (1+2+3+4+5+6+7), so each bucket's share is count/28 rounded.
-    expect(screen.getByText("4% (1)")).toBeInTheDocument();
-    expect(screen.getByText("7% (2)")).toBeInTheDocument();
-    expect(screen.getByText("11% (3)")).toBeInTheDocument();
-    expect(screen.getByText("14% (4)")).toBeInTheDocument();
-    expect(screen.getByText("18% (5)")).toBeInTheDocument();
-    expect(screen.getByText("21% (6)")).toBeInTheDocument();
-    expect(screen.getByText("25% (7)")).toBeInTheDocument();
+    // Total is 36 (1+2+3+4+5+6+7+8), so each bucket's share is count/36 rounded.
+    expect(screen.getByText("3% (1)")).toBeInTheDocument();
+    expect(screen.getByText("6% (2)")).toBeInTheDocument();
+    expect(screen.getByText("8% (3)")).toBeInTheDocument();
+    expect(screen.getByText("11% (4)")).toBeInTheDocument();
+    expect(screen.getByText("14% (5)")).toBeInTheDocument();
+    expect(screen.getByText("17% (6)")).toBeInTheDocument();
+    expect(screen.getByText("19% (7)")).toBeInTheDocument();
+    expect(screen.getByText("22% (8)")).toBeInTheDocument();
   });
 
   it("shows the total counting throws recorded", () => {
     render(<ScoreDistributionChart distribution={distribution} />);
 
-    expect(screen.getByText("28 counting throws recorded")).toBeInTheDocument();
+    expect(screen.getByText("36 counting throws recorded")).toBeInTheDocument();
   });
 
   it("uses singular phrasing for a single recorded throw", () => {
@@ -52,6 +55,7 @@ describe("ScoreDistributionChart", () => {
       <ScoreDistributionChart
         distribution={{
           ace: 1,
+          albatross: 0,
           eagle: 0,
           birdie: 0,
           par: 0,

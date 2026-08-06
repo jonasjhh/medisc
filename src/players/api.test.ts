@@ -63,6 +63,7 @@ function aScoreDistribution(
 ): ScoreDistribution {
   return scoreDistributionSchema.parse({
     ace: 0,
+    albatross: 0,
     eagle: 0,
     birdie: 0,
     par: 0,

@@ -8,6 +8,7 @@ import type { ScoreDistribution } from "./api";
 
 const ROWS: { outcome: ScoreOutcome; label: string }[] = [
   { outcome: "ace", label: "Ace" },
+  { outcome: "albatross", label: "Albatross" },
   { outcome: "eagle", label: "Eagle" },
   { outcome: "birdie", label: "Birdie" },
   { outcome: "par", label: "Par" },

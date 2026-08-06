@@ -763,25 +763,27 @@ describe("player score distribution", () => {
       courseName: "Maple Hill",
       layoutName: "Blue",
       holes: [
-        { number: 1, par: 5 }, // eagle: strokes = 3
-        { number: 2, par: 3 }, // ace: strokes = 1
-        { number: 3, par: 3 }, // birdie: strokes = 2
-        { number: 4, par: 3 }, // par: strokes = 3
-        { number: 5, par: 3 }, // bogey: strokes = 4
-        { number: 6, par: 3 }, // double bogey: strokes = 5
-        { number: 7, par: 3 }, // worse: strokes = 6
+        { number: 1, par: 5 }, // albatross: strokes = 2
+        { number: 2, par: 5 }, // eagle: strokes = 3
+        { number: 3, par: 3 }, // ace: strokes = 1
+        { number: 4, par: 3 }, // birdie: strokes = 2
+        { number: 5, par: 3 }, // par: strokes = 3
+        { number: 6, par: 3 }, // bogey: strokes = 4
+        { number: 7, par: 3 }, // double bogey: strokes = 5
+        { number: 8, par: 3 }, // worse: strokes = 6
       ],
     });
     const player = await createPlayer("Alice");
 
     await playRoundWithStrokes(courseId, layoutId, player.id, {
-      1: 3,
-      2: 1,
-      3: 2,
-      4: 3,
-      5: 4,
-      6: 5,
-      7: 6,
+      1: 2,
+      2: 3,
+      3: 1,
+      4: 2,
+      5: 3,
+      6: 4,
+      7: 5,
+      8: 6,
     });
 
     const { distribution } = await json(
@@ -790,6 +792,7 @@ describe("player score distribution", () => {
     );
     expect(distribution).toEqual({
       ace: 1,
+      albatross: 1,
       eagle: 1,
       birdie: 1,
       par: 1,
@@ -799,7 +802,7 @@ describe("player score distribution", () => {
     });
   });
 
-  it("an ace takes priority over eagle even on a hole where strokes = 1 would also qualify as eagle", async () => {
+  it("an ace takes priority over albatross even on a hole where strokes = 1 would also qualify as albatross", async () => {
     const { courseId, layoutId } = await seedCourse(env, {
       courseName: "Maple Hill",
       layoutName: "Blue",
@@ -814,7 +817,7 @@ describe("player score distribution", () => {
       scoreDistributionResponseSchema,
     );
     expect(distribution.ace).toBe(1);
-    expect(distribution.eagle).toBe(0);
+    expect(distribution.albatross).toBe(0);
   });
 
   it("aggregates across every layout the player has played, not just one", async () => {
@@ -874,6 +877,7 @@ describe("player score distribution", () => {
     );
     expect(distribution).toEqual({
       ace: 0,
+      albatross: 0,
       eagle: 0,
       birdie: 0,
       par: 0,
@@ -892,6 +896,7 @@ describe("player score distribution", () => {
     );
     expect(distribution).toEqual({
       ace: 0,
+      albatross: 0,
       eagle: 0,
       birdie: 0,
       par: 0,

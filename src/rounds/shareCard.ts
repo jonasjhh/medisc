@@ -548,12 +548,21 @@ function drawPlayerCard(
   );
   ctx.textAlign = "left";
 
+  // Pair each score with its hole's par by index *before* filtering out
+  // unrecorded holes — filtering first would shift the index and pair a
+  // recorded score with the wrong hole's par whenever an earlier hole in
+  // the round hasn't been played yet.
   const outcomes = player.scores
-    .filter((score) => score.recorded)
-    .map((score, index) => scoreOutcome(score.strokes, data.holes[index].par));
+    .map((score, index) => ({ score, par: data.holes[index].par }))
+    .filter(({ score }) => score.recorded)
+    .map(({ score, par }) => scoreOutcome(score.strokes, par));
   const countOf = (outcome: ScoreOutcome) =>
     outcomes.filter((o) => o === outcome).length;
-  const under = countOf("ace") + countOf("eagle") + countOf("birdie");
+  const under =
+    countOf("ace") +
+    countOf("albatross") +
+    countOf("eagle") +
+    countOf("birdie");
   const birdiePct = outcomes.length
     ? Math.round((under / outcomes.length) * 100)
     : 0;
@@ -612,6 +621,7 @@ function drawPlayerCard(
     28,
     [
       coloredSegment("ace"),
+      coloredSegment("albatross"),
       coloredSegment("eagle"),
       coloredSegment("birdie"),
       { count: countOf("par"), color: palette.divider, textColor: palette.ink },

@@ -46,6 +46,7 @@ describe("PlayerStatsPage", () => {
     vi.mocked(playersApi.getScoreDistribution).mockResolvedValue({
       distribution: {
         ace: 0,
+        albatross: 0,
         eagle: 0,
         birdie: 0,
         par: 0,
@@ -81,6 +82,7 @@ describe("PlayerStatsPage", () => {
     vi.mocked(playersApi.getScoreDistribution).mockResolvedValue({
       distribution: {
         ace: 1,
+        albatross: 0,
         eagle: 0,
         birdie: 3,
         par: 10,

@@ -227,18 +227,18 @@ describe("drawShareCard", () => {
       fakeContext as unknown as CanvasRenderingContext2D,
     );
     const canvas = document.createElement("canvas");
-    // Seven holes, each par 5, one score per outcome bucket: ace, eagle,
-    // birdie, par, bogey, double bogey, worse (triple+).
+    // Eight holes, each par 5, one score per outcome bucket: ace, albatross,
+    // eagle, birdie, par, bogey, double bogey, worse (triple+).
     const round: RoundDetail = {
       ...baseRound,
-      holes: [1, 2, 3, 4, 5, 6, 7].map((n) => ({
+      holes: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({
         id: n,
         number: n,
         par: 5,
         distanceMeters: null,
       })),
       players: [{ id: 1, name: "Alice" }],
-      scores: [1, 3, 4, 5, 6, 7, 8].map((strokes, i) => ({
+      scores: [1, 2, 3, 4, 5, 6, 7, 8].map((strokes, i) => ({
         id: i,
         holeId: i + 1,
         playerId: 1,
@@ -253,9 +253,52 @@ describe("drawShareCard", () => {
     drawShareCard(canvas, { type: "player", index: 0 }, data, "light");
 
     // One fillRect for the card background, one for the footer bar, plus
-    // one per non-empty distribution-bar segment (ace, eagle, birdie, par,
-    // bogey, doubleBogey, worse — all populated by the fixture above).
-    expect(fakeContext.fillRect.mock.calls.length).toBe(2 + 7);
+    // one per non-empty distribution-bar segment (ace, albatross, eagle,
+    // birdie, par, bogey, doubleBogey, worse — all populated above).
+    expect(fakeContext.fillRect.mock.calls.length).toBe(2 + 8);
+  });
+
+  it("pairs each recorded score with its own hole's par, not a par shifted by earlier unrecorded holes", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      fakeContext as unknown as CanvasRenderingContext2D,
+    );
+    const canvas = document.createElement("canvas");
+    // Hole 1 (par 3) is unrecorded — a hole played later in the round.
+    // Hole 2 (par 5) is recorded with 2 strokes: an albatross on hole 2's
+    // own par, not a birdie as it would be if paired against hole 1's par.
+    const round: RoundDetail = {
+      ...baseRound,
+      holes: [
+        { id: 1, number: 1, par: 3, distanceMeters: null },
+        { id: 2, number: 2, par: 5, distanceMeters: null },
+      ],
+      players: [{ id: 1, name: "Alice" }],
+      scores: [
+        {
+          id: 1,
+          holeId: 1,
+          playerId: 1,
+          strokes: 3,
+          penalties: 0,
+          recorded: false,
+        },
+        {
+          id: 2,
+          holeId: 2,
+          playerId: 1,
+          strokes: 2,
+          penalties: 0,
+          recorded: true,
+        },
+      ],
+    };
+    const data = buildShareCardData(round);
+
+    fakeContext.fillRect.mockClear();
+    drawShareCard(canvas, { type: "player", index: 0 }, data, "light");
+
+    // Card background + footer + exactly one segment (albatross).
+    expect(fakeContext.fillRect.mock.calls.length).toBe(3);
   });
 
   it("falls back to a plain TOT label when no hole has a recorded distance", () => {

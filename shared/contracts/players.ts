@@ -53,6 +53,7 @@ export type HoleStatsResponse = z.infer<typeof holeStatsResponseSchema>;
 // interchangeable in the UI without a translation layer.
 export const scoreDistributionSchema = z.object({
   ace: z.number(),
+  albatross: z.number(),
   eagle: z.number(),
   birdie: z.number(),
   par: z.number(),
