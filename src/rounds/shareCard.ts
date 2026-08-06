@@ -171,12 +171,11 @@ function truncateToWidth(
 
 interface Palette {
   background: string;
-  panel: string;
   divider: string;
   ink: string;
   mutedInk: string;
   green: string;
-  accentText: string; // text-safe green (under-par scores, winner highlight)
+  accentText: string; // text-safe green (under-par scores)
 }
 
 // accentText reuses adjusterTextColors.birdie — it's already tuned per mode
@@ -184,7 +183,6 @@ interface Palette {
 const PALETTES: Record<CardMode, Palette> = {
   dark: {
     background: "#121212",
-    panel: "#1e1e1e",
     divider: "#333a30",
     ink: "#f2f4ef",
     mutedInk: "#9aa79c",
@@ -193,7 +191,6 @@ const PALETTES: Record<CardMode, Palette> = {
   },
   light: {
     background: "#f6f7f5",
-    panel: "#ffffff",
     divider: "#d8ddd4",
     ink: "#1a2117",
     mutedInk: "#55624f",
@@ -410,18 +407,9 @@ function drawFullCard(
 
   data.players.forEach((player, index) => {
     const rowY = layout.firstRowY + index * layout.rowHeight;
-    if (index === 0) {
-      ctx.fillStyle = palette.panel;
-      ctx.fillRect(
-        0,
-        rowY - layout.rowHeight / 2,
-        CARD_WIDTH,
-        layout.rowHeight,
-      );
-    }
 
     ctx.textAlign = "left";
-    ctx.fillStyle = index === 0 ? palette.accentText : palette.ink;
+    ctx.fillStyle = palette.ink;
     ctx.font = "600 26px system-ui, sans-serif";
     ctx.fillText(
       truncateToWidth(ctx, player.name, labelColWidth - 16),
