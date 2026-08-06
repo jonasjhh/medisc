@@ -4,6 +4,7 @@ import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
+import { HOLES_PER_GROUP } from "../shared/chunk";
 import type { RoundHole, RoundPlayer, RoundScore } from "./api";
 import { ScoreBadge } from "./ScoreBadge";
 
@@ -26,12 +27,22 @@ export function ScorecardGroupTable({
   players: RoundPlayer[];
   scoreByKey: Map<string, RoundScore>;
 }) {
+  // Pad a short trailing group (e.g. 3 leftover holes) out to a full 9
+  // columns with blank cells, so its columns are sized the same as a
+  // complete group's and the real holes stay left-aligned instead of
+  // stretching to fill the row — matches LayoutHoleTables on the course page.
+  const padded: (RoundHole | null)[] = [...holes];
+  while (padded.length < HOLES_PER_GROUP) {
+    padded.push(null);
+  }
+
   return (
     <Box sx={{ overflowX: "auto" }}>
       <Table
         size="small"
         aria-label={`Scorecard summary, holes ${holes[0].number}–${holes[holes.length - 1].number}`}
         sx={{
+          width: "auto",
           "& td, & th": {
             px: { xs: 0.5, sm: 0.75 },
             py: { xs: 0.25, sm: 0.5 },
@@ -42,9 +53,9 @@ export function ScorecardGroupTable({
         <TableHead>
           <TableRow>
             <TableCell sx={labelColSx}>Hole</TableCell>
-            {holes.map((roundHole) => (
-              <TableCell key={roundHole.id} align="center">
-                {roundHole.number}
+            {padded.map((roundHole, index) => (
+              <TableCell key={roundHole?.id ?? `pad-${index}`} align="center">
+                {roundHole?.number}
               </TableCell>
             ))}
           </TableRow>
@@ -52,13 +63,13 @@ export function ScorecardGroupTable({
             <TableCell sx={{ ...labelColSx, color: "text.secondary" }}>
               Par
             </TableCell>
-            {holes.map((roundHole) => (
+            {padded.map((roundHole, index) => (
               <TableCell
-                key={roundHole.id}
+                key={roundHole?.id ?? `pad-${index}`}
                 align="center"
                 sx={{ color: "text.secondary" }}
               >
-                {roundHole.par}
+                {roundHole?.par}
               </TableCell>
             ))}
           </TableRow>
@@ -69,11 +80,16 @@ export function ScorecardGroupTable({
               <TableCell component="th" scope="row" sx={labelColSx}>
                 {player.name}
               </TableCell>
-              {holes.map((roundHole) => {
-                const score = scoreByKey.get(`${roundHole.id}:${player.id}`);
+              {padded.map((roundHole, index) => {
+                const score = roundHole
+                  ? scoreByKey.get(`${roundHole.id}:${player.id}`)
+                  : undefined;
                 return (
-                  <TableCell key={roundHole.id} align="center">
-                    {score && (
+                  <TableCell
+                    key={roundHole?.id ?? `pad-${index}`}
+                    align="center"
+                  >
+                    {score && roundHole && (
                       <ScoreBadge
                         strokes={score.strokes}
                         par={roundHole.par}
