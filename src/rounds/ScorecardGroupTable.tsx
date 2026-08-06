@@ -7,6 +7,16 @@ import TableRow from "@mui/material/TableRow";
 import type { RoundHole, RoundPlayer, RoundScore } from "./api";
 import { ScoreBadge } from "./ScoreBadge";
 
+// Kept narrow and truncated on mobile so the label column doesn't push the
+// 9 fixed hole columns past what fits on a portrait phone without scrolling
+// — the full name is always visible elsewhere (header, Players card).
+const labelColSx = {
+  maxWidth: { xs: 64, sm: "none" },
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
 export function ScorecardGroupTable({
   holes,
   players,
@@ -22,12 +32,16 @@ export function ScorecardGroupTable({
         size="small"
         aria-label={`Scorecard summary, holes ${holes[0].number}–${holes[holes.length - 1].number}`}
         sx={{
-          "& td, & th": { px: 0.75, py: 0.5, fontSize: "0.8125rem" },
+          "& td, & th": {
+            px: { xs: 0.5, sm: 0.75 },
+            py: { xs: 0.25, sm: 0.5 },
+            fontSize: { xs: "0.6875rem", sm: "0.8125rem" },
+          },
         }}
       >
         <TableHead>
           <TableRow>
-            <TableCell>Hole</TableCell>
+            <TableCell sx={labelColSx}>Hole</TableCell>
             {holes.map((roundHole) => (
               <TableCell key={roundHole.id} align="center">
                 {roundHole.number}
@@ -35,7 +49,9 @@ export function ScorecardGroupTable({
             ))}
           </TableRow>
           <TableRow>
-            <TableCell sx={{ color: "text.secondary" }}>Par</TableCell>
+            <TableCell sx={{ ...labelColSx, color: "text.secondary" }}>
+              Par
+            </TableCell>
             {holes.map((roundHole) => (
               <TableCell
                 key={roundHole.id}
@@ -50,7 +66,7 @@ export function ScorecardGroupTable({
         <TableBody>
           {players.map((player) => (
             <TableRow key={player.id}>
-              <TableCell component="th" scope="row">
+              <TableCell component="th" scope="row" sx={labelColSx}>
                 {player.name}
               </TableCell>
               {holes.map((roundHole) => {

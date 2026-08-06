@@ -24,13 +24,13 @@ export function ScoreBadge({
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        width: 22,
-        height: 22,
+        width: { xs: 18, sm: 22 },
+        height: { xs: 18, sm: 22 },
         borderRadius: 0.75,
         bgcolor: colors?.background,
         color: colors?.text ?? "text.primary",
         fontWeight: colors ? 700 : 400,
-        fontSize: "0.75rem",
+        fontSize: { xs: "0.6875rem", sm: "0.75rem" },
         lineHeight: 1,
       }}
     >
