@@ -523,6 +523,12 @@ function drawPlayerCard(
     textX,
     avatarCy + 30,
   );
+  ctx.font = "22px system-ui, sans-serif";
+  ctx.fillText(
+    truncateToWidth(ctx, data.layoutName, CARD_WIDTH - textX - 260),
+    textX,
+    avatarCy + 58,
+  );
 
   const diff = player.total - player.par;
   const scoreDiff = relativeToPar(player.total, player.par);

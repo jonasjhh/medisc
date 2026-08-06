@@ -208,6 +208,20 @@ describe("drawShareCard", () => {
     expect(drawnText).toContain("7");
   });
 
+  it("shows the layout name below the course name on a player card", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      fakeContext as unknown as CanvasRenderingContext2D,
+    );
+    const canvas = document.createElement("canvas");
+    const data = buildShareCardData(baseRound);
+
+    drawShareCard(canvas, { type: "player", index: 0 }, data, "light");
+
+    const drawnText = fakeContext.fillText.mock.calls.map((call) => call[0]);
+    expect(drawnText).toContain("Maple Hill");
+    expect(drawnText).toContain("Blue");
+  });
+
   it("falls back to a plain TOT label when no hole has a recorded distance", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
       fakeContext as unknown as CanvasRenderingContext2D,
