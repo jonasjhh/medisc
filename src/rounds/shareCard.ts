@@ -355,20 +355,16 @@ function drawFullCard(
   ctx.fillStyle = palette.background;
   ctx.fillRect(0, 0, CARD_WIDTH, height);
 
-  ctx.fillStyle = palette.mutedInk;
-  ctx.font = "26px system-ui, sans-serif";
-  ctx.fillText("Full scorecard", MARGIN_X, 70);
-
   ctx.fillStyle = palette.ink;
   ctx.font = "700 48px system-ui, sans-serif";
   ctx.fillText(
     truncateToWidth(ctx, data.courseName, CARD_WIDTH - MARGIN_X * 2),
     MARGIN_X,
-    130,
+    80,
   );
   ctx.fillStyle = palette.mutedInk;
   ctx.font = "28px system-ui, sans-serif";
-  ctx.fillText(data.layoutName, MARGIN_X, 168);
+  ctx.fillText(data.layoutName, MARGIN_X, 120);
 
   const labelColWidth = 220;
   const colWidth = holeColWidth(data.holes.length, labelColWidth);
