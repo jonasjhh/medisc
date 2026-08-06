@@ -1,6 +1,7 @@
 import type { RoundDetail } from "./api";
 import { formatDateTime } from "../shared/formatDateTime";
 import { adjusterTextColors, badgeColors, scoreOutcome } from "./scoreColor";
+import type { ScoreOutcome } from "./scoreColor";
 import { formatWeather } from "./weather";
 
 export type CardMode = "light" | "dark";
@@ -452,7 +453,7 @@ function drawSegmentedBar(
   y: number,
   width: number,
   height: number,
-  segments: { count: number; color: string }[],
+  segments: { count: number; color: string; textColor: string }[],
 ) {
   const total = segments.reduce((sum, seg) => sum + seg.count, 0);
   if (total === 0) {
@@ -470,7 +471,7 @@ function drawSegmentedBar(
     ctx.fillStyle = seg.color;
     ctx.fillRect(cursor, y, Math.max(0, segWidth - gap), height);
     if (segWidth > 30) {
-      ctx.fillStyle = "#121212";
+      ctx.fillStyle = seg.textColor;
       ctx.textAlign = "center";
       ctx.font = "700 16px system-ui, sans-serif";
       ctx.fillText(`${seg.count}`, cursor + segWidth / 2, y + height / 2 + 5);
@@ -550,11 +551,9 @@ function drawPlayerCard(
   const outcomes = player.scores
     .filter((score) => score.recorded)
     .map((score, index) => scoreOutcome(score.strokes, data.holes[index].par));
-  const under = outcomes.filter(
-    (o) => o === "ace" || o === "eagle" || o === "birdie",
-  ).length;
-  const par = outcomes.filter((o) => o === "par").length;
-  const over = outcomes.length - under - par;
+  const countOf = (outcome: ScoreOutcome) =>
+    outcomes.filter((o) => o === outcome).length;
+  const under = countOf("ace") + countOf("eagle") + countOf("birdie");
   const birdiePct = outcomes.length
     ? Math.round((under / outcomes.length) * 100)
     : 0;
@@ -599,6 +598,11 @@ function drawPlayerCard(
 
   const barX = MARGIN_X + layout.donutR * 2 + 32;
   const barWidth = CARD_WIDTH - barX - MARGIN_X;
+  const coloredSegment = (outcome: Exclude<ScoreOutcome, "par">) => ({
+    count: countOf(outcome),
+    color: badgeColors[outcome][mode].background,
+    textColor: badgeColors[outcome][mode].text,
+  });
   drawSegmentedBar(
     ctx,
     palette,
@@ -607,9 +611,13 @@ function drawPlayerCard(
     barWidth,
     28,
     [
-      { count: under, color: badgeColors.birdie[mode].background },
-      { count: par, color: palette.divider },
-      { count: over, color: badgeColors.bogey[mode].background },
+      coloredSegment("ace"),
+      coloredSegment("eagle"),
+      coloredSegment("birdie"),
+      { count: countOf("par"), color: palette.divider, textColor: palette.ink },
+      coloredSegment("bogey"),
+      coloredSegment("doubleBogey"),
+      coloredSegment("worse"),
     ],
   );
 

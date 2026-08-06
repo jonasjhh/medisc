@@ -222,6 +222,42 @@ describe("drawShareCard", () => {
     expect(drawnText).toContain("Blue");
   });
 
+  it("draws a distribution-bar segment for every score outcome, not just under/even/over", () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      fakeContext as unknown as CanvasRenderingContext2D,
+    );
+    const canvas = document.createElement("canvas");
+    // Seven holes, each par 5, one score per outcome bucket: ace, eagle,
+    // birdie, par, bogey, double bogey, worse (triple+).
+    const round: RoundDetail = {
+      ...baseRound,
+      holes: [1, 2, 3, 4, 5, 6, 7].map((n) => ({
+        id: n,
+        number: n,
+        par: 5,
+        distanceMeters: null,
+      })),
+      players: [{ id: 1, name: "Alice" }],
+      scores: [1, 3, 4, 5, 6, 7, 8].map((strokes, i) => ({
+        id: i,
+        holeId: i + 1,
+        playerId: 1,
+        strokes,
+        penalties: 0,
+        recorded: true,
+      })),
+    };
+    const data = buildShareCardData(round);
+
+    fakeContext.fillRect.mockClear();
+    drawShareCard(canvas, { type: "player", index: 0 }, data, "light");
+
+    // One fillRect for the card background, one for the footer bar, plus
+    // one per non-empty distribution-bar segment (ace, eagle, birdie, par,
+    // bogey, doubleBogey, worse — all populated by the fixture above).
+    expect(fakeContext.fillRect.mock.calls.length).toBe(2 + 7);
+  });
+
   it("falls back to a plain TOT label when no hole has a recorded distance", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
       fakeContext as unknown as CanvasRenderingContext2D,
