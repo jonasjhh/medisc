@@ -19,17 +19,27 @@ export function TotalsList({
   scores: RoundScore[];
   holesInScope: RoundHole[];
 }) {
-  const holeIds = new Set(holesInScope.map((hole) => hole.id));
-  const par = holesInScope.reduce((sum, hole) => sum + hole.par, 0);
+  const parByHoleId = new Map(holesInScope.map((hole) => [hole.id, hole.par]));
   return (
     <Stack spacing={0.5}>
       {players.map((player) => {
-        const total = scores
-          .filter(
-            (score) =>
-              score.playerId === player.id && holeIds.has(score.holeId),
-          )
-          .reduce((sum, score) => sum + score.strokes, 0);
+        // Par is summed over the same holes as the strokes total, not
+        // every hole in scope — otherwise a partly-played round would
+        // compare a few holes' worth of strokes against a much larger par.
+        const recordedScores = scores.filter(
+          (score) =>
+            score.playerId === player.id &&
+            score.recorded &&
+            parByHoleId.has(score.holeId),
+        );
+        const total = recordedScores.reduce(
+          (sum, score) => sum + score.strokes,
+          0,
+        );
+        const par = recordedScores.reduce(
+          (sum, score) => sum + (parByHoleId.get(score.holeId) ?? 0),
+          0,
+        );
         return (
           <Typography key={player.id} fontWeight={600}>
             {player.name}: {total} ({relativeToPar(total, par)})

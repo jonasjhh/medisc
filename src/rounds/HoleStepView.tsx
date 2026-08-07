@@ -43,23 +43,13 @@ export function HoleStepView({
 }) {
   const birdieValue = Math.max(1, hole.par - 1);
   const bogeyValue = hole.par + 1;
-  // Only holes with an actual recorded score, not every hole in the round —
-  // this is what makes the total the same no matter which hole is being
-  // viewed (it reflects what's genuinely been played, not the currently
-  // shown hole's position), and keeps not-yet-reached holes from silently
-  // padding the total with their placeholder default score.
-  const playedHoles = holeGroups
-    .flat()
-    .filter((candidate) =>
-      scores.some((score) => score.holeId === candidate.id && score.recorded),
-    );
 
   return (
     <Stack spacing={1.5}>
       <TotalsList
         players={players}
         scores={scores}
-        holesInScope={playedHoles}
+        holesInScope={holeGroups.flat()}
       />
       {players.map((player) => {
         const score = scores.find(

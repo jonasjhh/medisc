@@ -344,6 +344,28 @@ describe("rounds API", () => {
     expect(res.status).toBe(404);
   });
 
+  it("marks every still-unrecorded score as recorded when finishing", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const created = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+      roundDetailSchema,
+    );
+    expect(created.scores.every((s) => !s.recorded)).toBe(true);
+
+    const completed = await json(
+      await request(`/api/rounds/${created.id}/complete`, {
+        method: "POST",
+      }),
+      roundDetailSchema,
+    );
+    expect(completed.scores.every((s) => s.recorded)).toBe(true);
+  });
+
   it("reopens a completed round and allows editing scores again", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");

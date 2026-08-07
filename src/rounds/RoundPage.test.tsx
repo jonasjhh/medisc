@@ -1,4 +1,9 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  waitFor,
+  waitForElementToBeRemoved,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -614,13 +619,63 @@ describe("RoundPage", () => {
     expect(await screen.findByText("Summary")).toBeInTheDocument();
   });
 
-  it("shows an F9 checkpoint after the front 9 with cumulative totals", async () => {
+  it("warns before finishing a round with unrecorded holes, and does nothing until confirmed", async () => {
     vi.mocked(roundsApi.getRound).mockResolvedValue(twelveHoleRound);
     const user = userEvent.setup();
     renderPage();
 
     await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: /finish round/i }));
+
+    expect(
+      await screen.findByText(/haven't been scored yet/i),
+    ).toBeInTheDocument();
+    expect(roundsApi.completeRound).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitForElementToBeRemoved(() =>
+      screen.queryByText(/haven't been scored yet/i),
+    );
+    expect(roundsApi.completeRound).not.toHaveBeenCalled();
+  });
+
+  it("finishes anyway after confirming the unrecorded-holes warning", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue(twelveHoleRound);
+    vi.mocked(roundsApi.completeRound).mockResolvedValue({
+      ...twelveHoleRound,
+      completedAt: "2026-01-01 12:00:00",
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: /finish round/i }));
+    await screen.findByText(/haven't been scored yet/i);
+    await user.click(screen.getByRole("button", { name: /finish anyway/i }));
+
+    expect(roundsApi.completeRound).toHaveBeenCalledWith(1);
+    expect(await screen.findByText("Summary")).toBeInTheDocument();
+  });
+
+  it("shows an F9 checkpoint after the front 9 with cumulative totals", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue(twelveHoleRound);
+    vi.mocked(roundsApi.updateHoleScore).mockResolvedValue({
+      id: 3000,
+      roundId: 2,
+      holeId: 300,
+      playerId: 1,
+      strokes: 3,
+      penalties: 0,
+      recorded: true,
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
     for (let i = 0; i < 9; i++) {
+      // Explicitly record a par on each hole — totals only count holes
+      // that were actually entered, not the seeded default.
+      await user.click(screen.getByRole("button", { name: "Par" }));
       await user.click(screen.getByRole("button", { name: /next hole/i }));
     }
 

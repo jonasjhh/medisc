@@ -63,4 +63,34 @@ describe("TotalsList", () => {
     );
     expect(screen.getByText("Alice: 6 (-1)")).toBeInTheDocument();
   });
+
+  it("excludes unrecorded scores from both the total and par", () => {
+    render(
+      <TotalsList
+        players={players}
+        scores={[
+          {
+            id: 1000,
+            holeId: 100,
+            playerId: 1,
+            strokes: 2,
+            penalties: 0,
+            recorded: true,
+          },
+          {
+            id: 1001,
+            holeId: 101,
+            playerId: 1,
+            strokes: 4,
+            penalties: 0,
+            recorded: false,
+          },
+        ]}
+        holesInScope={holes}
+      />,
+    );
+    // Only hole 100 (par 3, 2 strokes) counts — hole 101's 4 strokes, and
+    // its par, are excluded since it's still unrecorded.
+    expect(screen.getByText("Alice: 2 (-1)")).toBeInTheDocument();
+  });
 });
