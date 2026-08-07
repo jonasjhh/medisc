@@ -132,6 +132,7 @@ export function RoundPage() {
       ) : (
         <HoleStepView
           hole={step.hole}
+          holeGroups={holeGroups}
           players={round.players}
           scores={round.scores}
           isCompleted={isCompleted}

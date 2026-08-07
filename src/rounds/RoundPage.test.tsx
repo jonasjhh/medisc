@@ -402,6 +402,54 @@ describe("RoundPage", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows the same running total on every hole, regardless of which one is being viewed", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue(twelveHoleRound);
+    vi.mocked(roundsApi.updateHoleScore).mockResolvedValue({
+      id: 3000,
+      roundId: 2,
+      holeId: 300,
+      playerId: 1,
+      strokes: 2,
+      penalties: 0,
+      recorded: true,
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: "Birdie" })); // par 3 - 1 = 2 strokes
+
+    await user.click(screen.getByRole("button", { name: /next hole/i }));
+    await screen.findByText("Hole 2");
+    await user.click(screen.getByRole("button", { name: "Par" })); // 3 strokes
+
+    // Total so far: 2 + 3 = 5 strokes against 3 + 3 = 6 par → 1 under.
+    expect(await screen.findByText("Alice: 5 (-1)")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /previous hole/i }));
+    await screen.findByText("Hole 1");
+    expect(screen.getByText("Alice: 5 (-1)")).toBeInTheDocument();
+  });
+
+  it("shows the round's total while browsing hole by hole on a completed round", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Completed");
+    await user.click(screen.getByRole("button", { name: /next hole/i }));
+    await screen.findByText("Hole 1");
+    // baseRound: hole 1 par 3 / 3 strokes, hole 2 par 4 / 4 strokes → even.
+    expect(screen.getByText("Alice: 7 (E)")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /next hole/i }));
+    await screen.findByText("Hole 2");
+    expect(screen.getByText("Alice: 7 (E)")).toBeInTheDocument();
+  });
+
   it("swaps a single player with the standalone swap button", async () => {
     vi.mocked(roundsApi.updateRound).mockResolvedValue({
       ...baseRound,
