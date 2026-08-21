@@ -85,6 +85,8 @@ export const holeBreakdownSchema = z.object({
     par: z.number(),
     distanceMeters: z.number().nullable(),
     layoutId: z.number(),
+    layoutName: z.string(),
+    courseName: z.string(),
   }),
   distribution: scoreDistributionSchema,
   throws: z.array(holeThrowSchema),

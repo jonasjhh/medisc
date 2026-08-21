@@ -53,6 +53,8 @@ interface HoleRow {
   par: number;
   distance_meters: number | null;
   layout_id: number;
+  layout_name: string;
+  course_name: string;
 }
 
 interface HoleThrowRow {
@@ -408,7 +410,12 @@ playersRoute.get("/:playerId/holes/:holeId/breakdown", async (c) => {
   }
 
   const hole = await c.env.DB.prepare(
-    "SELECT id, number, par, distance_meters, layout_id FROM holes WHERE id = ?",
+    `SELECT holes.id, holes.number, holes.par, holes.distance_meters,
+            holes.layout_id, layouts.name AS layout_name, courses.name AS course_name
+     FROM holes
+     JOIN layouts ON layouts.id = holes.layout_id
+     JOIN courses ON courses.id = layouts.course_id
+     WHERE holes.id = ?`,
   )
     .bind(holeId)
     .first<HoleRow>();
@@ -502,6 +509,8 @@ playersRoute.get("/:playerId/holes/:holeId/breakdown", async (c) => {
           par: hole.par,
           distanceMeters: hole.distance_meters,
           layoutId: hole.layout_id,
+          layoutName: hole.layout_name,
+          courseName: hole.course_name,
         },
         distribution,
         throws: throwRows.map((row) => ({

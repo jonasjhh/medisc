@@ -79,7 +79,15 @@ function aScoreDistribution(
 
 function aHoleBreakdown(overrides: Partial<HoleBreakdown> = {}): HoleBreakdown {
   return holeBreakdownSchema.parse({
-    hole: { id: 10, number: 1, par: 3, distanceMeters: 90, layoutId: 2 },
+    hole: {
+      id: 10,
+      number: 1,
+      par: 3,
+      distanceMeters: 90,
+      layoutId: 2,
+      layoutName: "Blue",
+      courseName: "Maple Hill",
+    },
     distribution: {
       ace: 0,
       albatross: 0,

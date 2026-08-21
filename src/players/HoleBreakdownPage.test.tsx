@@ -34,6 +34,29 @@ const emptyDistribution = {
   worse: 0,
 };
 
+interface HoleFixture {
+  id: number;
+  number: number;
+  par: number;
+  distanceMeters: number | null;
+  layoutId: number;
+  layoutName: string;
+  courseName: string;
+}
+
+function aHole(overrides: Partial<HoleFixture> = {}): HoleFixture {
+  return {
+    id: 100,
+    number: 1,
+    par: 3,
+    distanceMeters: null,
+    layoutId: 10,
+    layoutName: "Blue",
+    courseName: "Maple Hill",
+    ...overrides,
+  };
+}
+
 const holes = [
   {
     holeId: 100,
@@ -84,10 +107,10 @@ describe("HoleBreakdownPage", () => {
     vi.mocked(playersApi.getPlayerStats).mockResolvedValue({ holes });
   });
 
-  it("shows the hole, the comparison to the field, the distribution, and the throws", async () => {
+  it("shows the course, layout, hole, the comparison to the field, the distribution, and the throws", async () => {
     vi.mocked(playersApi.getHoleBreakdown).mockResolvedValue({
       breakdown: {
-        hole: { id: 100, number: 1, par: 3, distanceMeters: 90, layoutId: 10 },
+        hole: aHole({ distanceMeters: 90 }),
         distribution: { ...emptyDistribution, birdie: 1, par: 1 },
         throws: [
           { roundId: 1, date: "2026-08-01 10:00:00", strokes: 2, penalties: 0 },
@@ -100,6 +123,7 @@ describe("HoleBreakdownPage", () => {
 
     renderPage();
 
+    expect(await screen.findByText("Maple Hill — Blue")).toBeInTheDocument();
     expect(await screen.findByText("Hole 1")).toBeInTheDocument();
     expect(screen.getByText("Par 3 · 90 m")).toBeInTheDocument();
     expect(screen.getByText("2.5")).toBeInTheDocument();
@@ -116,13 +140,7 @@ describe("HoleBreakdownPage", () => {
     ) {
       return {
         breakdown: {
-          hole: {
-            id: 100,
-            number: 1,
-            par: 3,
-            distanceMeters: null,
-            layoutId: 10,
-          },
+          hole: aHole(),
           distribution: emptyDistribution,
           throws: [],
           playerAvgStrokes,
@@ -148,13 +166,7 @@ describe("HoleBreakdownPage", () => {
   it("shows an empty state when the player hasn't played this hole", async () => {
     vi.mocked(playersApi.getHoleBreakdown).mockResolvedValue({
       breakdown: {
-        hole: {
-          id: 100,
-          number: 1,
-          par: 3,
-          distanceMeters: null,
-          layoutId: 10,
-        },
+        hole: aHole(),
         distribution: emptyDistribution,
         throws: [],
         playerAvgStrokes: null,
@@ -174,13 +186,10 @@ describe("HoleBreakdownPage", () => {
     vi.mocked(playersApi.getHoleBreakdown).mockImplementation(
       async (_playerId, holeId) => ({
         breakdown: {
-          hole: {
+          hole: aHole({
             id: holeId,
             number: holes.find((h) => h.holeId === holeId)!.number,
-            par: 3,
-            distanceMeters: null,
-            layoutId: 10,
-          },
+          }),
           distribution: emptyDistribution,
           throws: [],
           playerAvgStrokes: null,
@@ -204,13 +213,7 @@ describe("HoleBreakdownPage", () => {
   it("disables Previous on the first hole", async () => {
     vi.mocked(playersApi.getHoleBreakdown).mockResolvedValue({
       breakdown: {
-        hole: {
-          id: 100,
-          number: 1,
-          par: 3,
-          distanceMeters: null,
-          layoutId: 10,
-        },
+        hole: aHole(),
         distribution: emptyDistribution,
         throws: [],
         playerAvgStrokes: null,

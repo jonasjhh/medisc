@@ -118,6 +118,9 @@ export function HoleBreakdownPage() {
               <ArrowBackIcon />
             </IconButton>
             <Box textAlign="center">
+              <Typography color="text.secondary" variant="body2">
+                {breakdown.hole.courseName} — {breakdown.hole.layoutName}
+              </Typography>
               <Typography variant="h4">Hole {breakdown.hole.number}</Typography>
               <Typography color="text.secondary">
                 Par {breakdown.hole.par}

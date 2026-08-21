@@ -1001,7 +1001,13 @@ describe("hole breakdown", () => {
       holeBreakdownResponseSchema,
     );
 
-    expect(breakdown.hole).toMatchObject({ number: 1, par: 3, layoutId });
+    expect(breakdown.hole).toMatchObject({
+      number: 1,
+      par: 3,
+      layoutId,
+      layoutName: "Blue",
+      courseName: "Maple Hill",
+    });
     expect(breakdown.distribution).toEqual({
       ace: 0,
       albatross: 0,
