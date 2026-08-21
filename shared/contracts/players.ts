@@ -69,3 +69,31 @@ export const scoreDistributionResponseSchema = z.object({
 export type ScoreDistributionResponse = z.infer<
   typeof scoreDistributionResponseSchema
 >;
+
+export const holeThrowSchema = z.object({
+  roundId: z.number(),
+  date: z.string(),
+  strokes: z.number(),
+  penalties: z.number(),
+});
+export type HoleThrow = z.infer<typeof holeThrowSchema>;
+
+export const holeBreakdownSchema = z.object({
+  hole: z.object({
+    id: z.number(),
+    number: z.number(),
+    par: z.number(),
+    distanceMeters: z.number().nullable(),
+    layoutId: z.number(),
+  }),
+  distribution: scoreDistributionSchema,
+  throws: z.array(holeThrowSchema),
+  playerAvgStrokes: z.number().nullable(),
+  allPlayersAvgStrokes: z.number().nullable(),
+});
+export type HoleBreakdown = z.infer<typeof holeBreakdownSchema>;
+
+export const holeBreakdownResponseSchema = z.object({
+  breakdown: holeBreakdownSchema,
+});
+export type HoleBreakdownResponse = z.infer<typeof holeBreakdownResponseSchema>;

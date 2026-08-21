@@ -188,6 +188,10 @@ describe("PlayerStatsPage", () => {
     expect(await screen.findByText("Maple Hill — Blue")).toBeInTheDocument();
     expect(playersApi.getPlayerStats).toHaveBeenCalledWith(1, 10);
     expect(await screen.findByText("3.5")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "1" })).toHaveAttribute(
+      "href",
+      "/players/1/holes/100",
+    );
   });
 
   it("switches layouts and refetches stats", async () => {

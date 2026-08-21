@@ -1,5 +1,6 @@
 import { deleteRequest, patchJson, postJson, request } from "../api/client";
 import {
+  holeBreakdownResponseSchema,
   holeStatsResponseSchema,
   playedLayoutsResponseSchema,
   playerListResponseSchema,
@@ -8,8 +9,11 @@ import {
   scoreDistributionResponseSchema,
 } from "../../shared/contracts/players";
 import type {
+  HoleBreakdown,
+  HoleBreakdownResponse,
   HoleStat,
   HoleStatsResponse,
+  HoleThrow,
   PlayedLayout,
   PlayedLayoutsResponse,
   Player,
@@ -20,8 +24,11 @@ import type {
 } from "../../shared/contracts/players";
 
 export type {
+  HoleBreakdown,
+  HoleBreakdownResponse,
   HoleStat,
   HoleStatsResponse,
+  HoleThrow,
   PlayedLayout,
   PlayedLayoutsResponse,
   Player,
@@ -94,5 +101,14 @@ export async function getScoreDistribution(
 ): Promise<ScoreDistributionResponse> {
   return scoreDistributionResponseSchema.parse(
     await request(`/api/players/${playerId}/score-distribution`),
+  );
+}
+
+export async function getHoleBreakdown(
+  playerId: number,
+  holeId: number,
+): Promise<HoleBreakdownResponse> {
+  return holeBreakdownResponseSchema.parse(
+    await request(`/api/players/${playerId}/holes/${holeId}/breakdown`),
   );
 }

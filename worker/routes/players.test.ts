@@ -4,6 +4,7 @@ import type { ZodTypeAny, z } from "zod";
 import app from "../index";
 import { seedCourse, seedUser } from "../test/seed";
 import {
+  holeBreakdownResponseSchema,
   playedLayoutsResponseSchema,
   playerListResponseSchema,
   playerSchema,
@@ -908,6 +909,244 @@ describe("player score distribution", () => {
 
   it("404s for a player that doesn't exist", async () => {
     const res = await request("/api/players/999/score-distribution");
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("hole breakdown", () => {
+  beforeEach(async () => {
+    await env.DB.exec("DELETE FROM hole_scores");
+    await env.DB.exec("DELETE FROM round_players");
+    await env.DB.exec("DELETE FROM rounds");
+    await env.DB.exec("DELETE FROM holes");
+    await env.DB.exec("DELETE FROM layouts");
+    await env.DB.exec("DELETE FROM courses");
+    await env.DB.exec("DELETE FROM device_link_codes");
+    await env.DB.exec("DELETE FROM device_tokens");
+    await env.DB.exec("DELETE FROM players");
+    await env.DB.exec("DELETE FROM users");
+  });
+
+  async function createPlayer(name: string) {
+    return json(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      }),
+      playerSchema,
+    );
+  }
+
+  // Creates a round for every given player, sets each player's strokes per
+  // hole number from their own map (a player with no entry for a hole
+  // leaves it at its unrecorded default), and completes the round.
+  async function playRoundWithStrokes(
+    courseId: number,
+    layoutId: number,
+    playerIds: number[],
+    strokesByHoleNumberByPlayer: Record<number, Record<number, number>>,
+  ) {
+    const round = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds }),
+      }),
+      roundDetailSchema,
+    );
+    for (const playerId of playerIds) {
+      const strokesByHoleNumber = strokesByHoleNumberByPlayer[playerId] ?? {};
+      for (const hole of round.holes) {
+        const strokes = strokesByHoleNumber[hole.number];
+        if (strokes === undefined) continue;
+        const score = round.scores.find(
+          (s) => s.holeId === hole.id && s.playerId === playerId,
+        )!;
+        await request(`/api/hole-scores/${score.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ strokes }),
+        });
+      }
+    }
+    await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
+    return round;
+  }
+
+  it("returns this player's distribution and throws, plus both averages compared to the field", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const alice = await createPlayer("Alice");
+    const bob = await createPlayer("Bob");
+
+    // Alice plays hole 1 twice (birdie, then par); Bob plays it once (bogey).
+    const firstRound = await playRoundWithStrokes(
+      courseId,
+      layoutId,
+      [alice.id, bob.id],
+      { [alice.id]: { 1: 2 }, [bob.id]: { 1: 4 } },
+    );
+    await playRoundWithStrokes(courseId, layoutId, [alice.id, bob.id], {
+      [alice.id]: { 1: 3 },
+      [bob.id]: {},
+    });
+    const holeId = firstRound.holes[0].id;
+
+    const { breakdown } = await json(
+      await request(`/api/players/${alice.id}/holes/${holeId}/breakdown`),
+      holeBreakdownResponseSchema,
+    );
+
+    expect(breakdown.hole).toMatchObject({ number: 1, par: 3, layoutId });
+    expect(breakdown.distribution).toEqual({
+      ace: 0,
+      albatross: 0,
+      eagle: 0,
+      birdie: 1,
+      par: 1,
+      bogey: 0,
+      doubleBogey: 0,
+      worse: 0,
+    });
+    expect(breakdown.throws.map((t) => t.strokes).sort()).toEqual([2, 3]);
+    expect(breakdown.playerAvgStrokes).toBe(2.5); // (2 + 3) / 2
+    // Field average: Alice's 2 + 3, plus Bob's 4, across 3 throws = 3.
+    expect(breakdown.allPlayersAvgStrokes).toBe(3);
+  });
+
+  it("excludes non-counting and in-progress rounds from both averages", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const alice = await createPlayer("Alice");
+    const bob = await createPlayer("Bob");
+
+    // Alice is the only player in this round — Bob has no legitimate
+    // connection to the hole yet, so his own rounds below are the only
+    // thing that could (incorrectly) show up in his breakdown.
+    const round = await playRoundWithStrokes(courseId, layoutId, [alice.id], {
+      [alice.id]: { 1: 3 },
+    });
+    const holeId = round.holes[0].id;
+
+    // A non-counting round, and one still in progress — neither should
+    // contribute to Bob's average or the field average.
+    const nonCounting = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          courseId,
+          layoutId,
+          playerIds: [bob.id],
+        }),
+      }),
+      roundDetailSchema,
+    );
+    const bobScoreNonCounting = nonCounting.scores.find(
+      (s) => s.holeId === holeId,
+    )!;
+    await request(`/api/hole-scores/${bobScoreNonCounting.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ strokes: 6 }),
+    });
+    await request(`/api/rounds/${nonCounting.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ counting: false }),
+    });
+    await request(`/api/rounds/${nonCounting.id}/complete`, {
+      method: "POST",
+    });
+
+    await request("/api/rounds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ courseId, layoutId, playerIds: [bob.id] }),
+    }); // Never completed.
+
+    const { breakdown } = await json(
+      await request(`/api/players/${bob.id}/holes/${holeId}/breakdown`),
+      holeBreakdownResponseSchema,
+    );
+    expect(breakdown.throws).toEqual([]);
+    expect(breakdown.playerAvgStrokes).toBeNull();
+    // Only Alice's counting, completed, recorded throw (3) counts.
+    expect(breakdown.allPlayersAvgStrokes).toBe(3);
+  });
+
+  it("excludes a score still marked unrecorded on an already-completed round", async () => {
+    // Mirrors a legacy round completed before finishing locked in every
+    // hole (see migration 0022) — a stale recorded = 0 row should still be
+    // excluded even though its round is completed and counting.
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const alice = await createPlayer("Alice");
+    const bob = await createPlayer("Bob");
+
+    const round = await playRoundWithStrokes(
+      courseId,
+      layoutId,
+      [alice.id, bob.id],
+      { [alice.id]: { 1: 3 } },
+    );
+    const holeId = round.holes[0].id;
+
+    await env.DB.prepare(
+      "UPDATE hole_scores SET recorded = 0 WHERE round_id = ? AND player_id = ?",
+    )
+      .bind(round.id, bob.id)
+      .run();
+
+    const { breakdown } = await json(
+      await request(`/api/players/${bob.id}/holes/${holeId}/breakdown`),
+      holeBreakdownResponseSchema,
+    );
+    expect(breakdown.throws).toEqual([]);
+    expect(breakdown.playerAvgStrokes).toBeNull();
+    expect(breakdown.allPlayersAvgStrokes).toBe(3); // Only Alice's throw counts.
+  });
+
+  it("returns nulls and an empty throw list when the player has never played this hole", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const alice = await createPlayer("Alice");
+    const bob = await createPlayer("Bob");
+    const round = await playRoundWithStrokes(courseId, layoutId, [bob.id], {
+      [bob.id]: { 1: 3 },
+    });
+    const holeId = round.holes[0].id;
+
+    const { breakdown } = await json(
+      await request(`/api/players/${alice.id}/holes/${holeId}/breakdown`),
+      holeBreakdownResponseSchema,
+    );
+    expect(breakdown.throws).toEqual([]);
+    expect(breakdown.playerAvgStrokes).toBeNull();
+    expect(breakdown.allPlayersAvgStrokes).toBe(3); // Bob's throw still counts.
+  });
+
+  it("404s for a player that doesn't exist", async () => {
+    const res = await request("/api/players/999/holes/1/breakdown");
+    expect(res.status).toBe(404);
+  });
+
+  it("404s for a hole that doesn't exist", async () => {
+    const alice = await createPlayer("Alice");
+    const res = await request(`/api/players/${alice.id}/holes/999/breakdown`);
     expect(res.status).toBe(404);
   });
 });

@@ -6,6 +6,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
+import Link from "@mui/material/Link";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
@@ -168,8 +169,16 @@ export function PlayerStatsPage() {
                   </TableHead>
                   <TableBody>
                     {holes.map((hole) => (
-                      <TableRow key={hole.holeId}>
-                        <TableCell>{hole.number}</TableCell>
+                      <TableRow key={hole.holeId} hover>
+                        <TableCell>
+                          <Link
+                            component={RouterLink}
+                            to={`/players/${id}/holes/${hole.holeId}`}
+                            underline="hover"
+                          >
+                            {hole.number}
+                          </Link>
+                        </TableCell>
                         <TableCell align="right">{hole.par}</TableCell>
                         <TableCell align="right">{hole.timesPlayed}</TableCell>
                         <TableCell align="right">

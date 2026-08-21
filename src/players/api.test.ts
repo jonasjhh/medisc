@@ -3,6 +3,7 @@ import {
   claimPlayer,
   createPlayer,
   deletePlayer,
+  getHoleBreakdown,
   getPlayerLayouts,
   getPlayerStats,
   getRecentCourses,
@@ -11,12 +12,14 @@ import {
   updatePlayer,
 } from "./api";
 import {
+  holeBreakdownSchema,
   holeStatSchema,
   playedLayoutSchema,
   playerSchema,
   scoreDistributionSchema,
 } from "../../shared/contracts/players";
 import type {
+  HoleBreakdown,
   HoleStat,
   PlayedLayout,
   Player,
@@ -70,6 +73,26 @@ function aScoreDistribution(
     bogey: 0,
     doubleBogey: 0,
     worse: 0,
+    ...overrides,
+  });
+}
+
+function aHoleBreakdown(overrides: Partial<HoleBreakdown> = {}): HoleBreakdown {
+  return holeBreakdownSchema.parse({
+    hole: { id: 10, number: 1, par: 3, distanceMeters: 90, layoutId: 2 },
+    distribution: {
+      ace: 0,
+      albatross: 0,
+      eagle: 0,
+      birdie: 0,
+      par: 0,
+      bogey: 0,
+      doubleBogey: 0,
+      worse: 0,
+    },
+    throws: [],
+    playerAvgStrokes: null,
+    allPlayersAvgStrokes: null,
     ...overrides,
   });
 }
@@ -182,6 +205,18 @@ describe("players api", () => {
     expect(distribution).toEqual(aScoreDistribution({ birdie: 3, par: 10 }));
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/players/1/score-distribution",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+  });
+
+  it("gets a hole breakdown for a player", async () => {
+    const fetchMock = mockFetchOnce({
+      breakdown: aHoleBreakdown({ playerAvgStrokes: 2.5 }),
+    });
+    const { breakdown } = await getHoleBreakdown(1, 10);
+    expect(breakdown).toEqual(aHoleBreakdown({ playerAvgStrokes: 2.5 }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/players/1/holes/10/breakdown",
       expect.objectContaining({ headers: expect.any(Headers) }),
     );
   });

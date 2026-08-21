@@ -3,6 +3,7 @@ import type { AppEnv } from "../types";
 import { createPlayerSchema, updatePlayerSchema } from "../schemas";
 import { parseIntParam } from "../params";
 import {
+  holeBreakdownResponseSchema,
   holeStatsResponseSchema,
   playedLayoutsResponseSchema,
   playerListResponseSchema,
@@ -44,6 +45,21 @@ interface HoleStatRow {
 interface ScoreBucketRow {
   bucket: keyof ScoreDistribution;
   count: number;
+}
+
+interface HoleRow {
+  id: number;
+  number: number;
+  par: number;
+  distance_meters: number | null;
+  layout_id: number;
+}
+
+interface HoleThrowRow {
+  round_id: number;
+  date: string;
+  strokes: number;
+  penalties: number;
 }
 
 async function countPlayerRounds(db: D1Database, playerId: number) {
@@ -375,6 +391,130 @@ playersRoute.get("/:playerId/score-distribution", async (c) => {
   }
 
   return c.json(scoreDistributionResponseSchema.parse({ distribution }));
+});
+
+playersRoute.get("/:playerId/holes/:holeId/breakdown", async (c) => {
+  const playerId = parseIntParam(c.req.param("playerId"));
+  const holeId = parseIntParam(c.req.param("holeId"));
+  if (playerId === null || holeId === null) {
+    return c.json({ error: "Invalid id" }, 400);
+  }
+
+  const player = await c.env.DB.prepare("SELECT id FROM players WHERE id = ?")
+    .bind(playerId)
+    .first();
+  if (!player) {
+    return c.json({ error: "Player not found" }, 404);
+  }
+
+  const hole = await c.env.DB.prepare(
+    "SELECT id, number, par, distance_meters, layout_id FROM holes WHERE id = ?",
+  )
+    .bind(holeId)
+    .first<HoleRow>();
+  if (!hole) {
+    return c.json({ error: "Hole not found" }, 404);
+  }
+
+  // Only rounds that count and are actually finished, and only strokes the
+  // player explicitly entered (see TotalsList.tsx's same rule) — a hole
+  // nobody touched shouldn't pad either average with its seeded default.
+  const [{ results: bucketRows }, { results: throwRows }, allPlayersAvgRow] =
+    await Promise.all([
+      c.env.DB.prepare(
+        `SELECT
+           CASE
+             WHEN hole_scores.strokes = 1 THEN 'ace'
+             WHEN hole_scores.strokes <= holes.par - 3 THEN 'albatross'
+             WHEN hole_scores.strokes = holes.par - 2 THEN 'eagle'
+             WHEN hole_scores.strokes = holes.par - 1 THEN 'birdie'
+             WHEN hole_scores.strokes = holes.par THEN 'par'
+             WHEN hole_scores.strokes = holes.par + 1 THEN 'bogey'
+             WHEN hole_scores.strokes = holes.par + 2 THEN 'doubleBogey'
+             ELSE 'worse'
+           END AS bucket,
+           COUNT(*) AS count
+         FROM hole_scores
+         JOIN rounds ON rounds.id = hole_scores.round_id
+         JOIN holes ON holes.id = hole_scores.hole_id
+         WHERE hole_scores.player_id = ?
+           AND hole_scores.hole_id = ?
+           AND hole_scores.recorded = 1
+           AND rounds.completed_at IS NOT NULL
+           AND rounds.counting = 1
+         GROUP BY bucket`,
+      )
+        .bind(playerId, holeId)
+        .all<ScoreBucketRow>(),
+      c.env.DB.prepare(
+        `SELECT hole_scores.round_id,
+                COALESCE(rounds.completed_at, rounds.created_at) AS date,
+                hole_scores.strokes, hole_scores.penalties
+         FROM hole_scores
+         JOIN rounds ON rounds.id = hole_scores.round_id
+         WHERE hole_scores.player_id = ?
+           AND hole_scores.hole_id = ?
+           AND hole_scores.recorded = 1
+           AND rounds.completed_at IS NOT NULL
+           AND rounds.counting = 1
+         ORDER BY date DESC`,
+      )
+        .bind(playerId, holeId)
+        .all<HoleThrowRow>(),
+      c.env.DB.prepare(
+        `SELECT AVG(hole_scores.strokes) AS avg_strokes
+         FROM hole_scores
+         JOIN rounds ON rounds.id = hole_scores.round_id
+         WHERE hole_scores.hole_id = ?
+           AND hole_scores.recorded = 1
+           AND rounds.completed_at IS NOT NULL
+           AND rounds.counting = 1`,
+      )
+        .bind(holeId)
+        .first<{ avg_strokes: number | null }>(),
+    ]);
+
+  const distribution: ScoreDistribution = {
+    ace: 0,
+    albatross: 0,
+    eagle: 0,
+    birdie: 0,
+    par: 0,
+    bogey: 0,
+    doubleBogey: 0,
+    worse: 0,
+  };
+  for (const row of bucketRows) {
+    distribution[row.bucket] = row.count;
+  }
+
+  const playerAvgStrokes =
+    throwRows.length > 0
+      ? throwRows.reduce((sum, row) => sum + row.strokes, 0) / throwRows.length
+      : null;
+
+  return c.json(
+    holeBreakdownResponseSchema.parse({
+      breakdown: {
+        hole: {
+          id: hole.id,
+          number: hole.number,
+          par: hole.par,
+          distanceMeters: hole.distance_meters,
+          layoutId: hole.layout_id,
+        },
+        distribution,
+        throws: throwRows.map((row) => ({
+          roundId: row.round_id,
+          date: row.date,
+          strokes: row.strokes,
+          penalties: row.penalties,
+        })),
+        playerAvgStrokes,
+        allPlayersAvgStrokes: allPlayersAvgRow?.avg_strokes ?? null,
+      },
+    }),
+  );
 });
 
 playersRoute.post("/:playerId/claim", async (c) => {

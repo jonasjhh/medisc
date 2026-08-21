@@ -30,6 +30,7 @@ import { RoundPage } from "./rounds/RoundPage";
 import { RoundsListPage } from "./rounds/RoundsListPage";
 import { PlayersListPage } from "./players/PlayersListPage";
 import { PlayerStatsPage } from "./players/PlayerStatsPage";
+import { HoleBreakdownPage } from "./players/HoleBreakdownPage";
 import { InstallPrompt } from "./app/InstallPrompt";
 import { OfflineBanner } from "./app/OfflineBanner";
 import { UpdatePrompt } from "./app/UpdatePrompt";
@@ -223,6 +224,10 @@ export function App() {
           <Route path="/rounds/:roundId" element={<RoundPage />} />
           <Route path="/players" element={<PlayersListPage />} />
           <Route path="/players/:playerId" element={<PlayerStatsPage />} />
+          <Route
+            path="/players/:playerId/holes/:holeId"
+            element={<HoleBreakdownPage />}
+          />
         </Routes>
       </Box>
     </BrowserRouter>
