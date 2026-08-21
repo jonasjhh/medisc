@@ -109,6 +109,42 @@ describe("HoleBreakdownPage", () => {
     expect(screen.getByText("+1 pen.")).toBeInTheDocument();
   });
 
+  it("colors a rounded-to-even diff the same regardless of its unrounded sign", async () => {
+    function aBreakdown(
+      playerAvgStrokes: number,
+      allPlayersAvgStrokes: number,
+    ) {
+      return {
+        breakdown: {
+          hole: {
+            id: 100,
+            number: 1,
+            par: 3,
+            distanceMeters: null,
+            layoutId: 10,
+          },
+          distribution: emptyDistribution,
+          throws: [],
+          playerAvgStrokes,
+          allPlayersAvgStrokes,
+        },
+      };
+    }
+    vi.mocked(playersApi.getHoleBreakdown)
+      .mockResolvedValueOnce(aBreakdown(2.96, 3))
+      .mockResolvedValueOnce(aBreakdown(3.04, 3));
+
+    const first = renderPage();
+    const belowColor = getComputedStyle(await first.findByText("even")).color;
+    first.unmount();
+
+    const second = renderPage();
+    const aboveColor = getComputedStyle(await second.findByText("even")).color;
+    second.unmount();
+
+    expect(belowColor).toBe(aboveColor);
+  });
+
   it("shows an empty state when the player hasn't played this hole", async () => {
     vi.mocked(playersApi.getHoleBreakdown).mockResolvedValue({
       breakdown: {

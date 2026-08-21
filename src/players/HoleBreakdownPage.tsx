@@ -22,12 +22,17 @@ function formatAvg(value: number | null): string {
   return value === null ? "—" : value.toFixed(1);
 }
 
-function formatDiff(diff: number): string {
-  const rounded = Math.round(diff * 10) / 10;
-  if (rounded === 0) {
+function roundDiff(diff: number): number {
+  return Math.round(diff * 10) / 10;
+}
+
+function formatDiff(roundedDiff: number): string {
+  if (roundedDiff === 0) {
     return "even";
   }
-  return rounded > 0 ? `+${rounded.toFixed(1)}` : rounded.toFixed(1);
+  return roundedDiff > 0
+    ? `+${roundedDiff.toFixed(1)}`
+    : roundedDiff.toFixed(1);
 }
 
 export function HoleBreakdownPage() {
@@ -85,7 +90,7 @@ export function HoleBreakdownPage() {
   const diff =
     breakdown?.playerAvgStrokes != null &&
     breakdown.allPlayersAvgStrokes != null
-      ? breakdown.playerAvgStrokes - breakdown.allPlayersAvgStrokes
+      ? roundDiff(breakdown.playerAvgStrokes - breakdown.allPlayersAvgStrokes)
       : null;
 
   return (
