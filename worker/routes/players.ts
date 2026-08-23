@@ -64,6 +64,46 @@ interface HoleThrowRow {
   penalties: number;
 }
 
+// Mirrors src/rounds/scoreColor.ts's scoreOutcome().
+const SCORE_BUCKET_CASE = `CASE
+           WHEN hole_scores.strokes = 1 THEN 'ace'
+           WHEN hole_scores.strokes <= holes.par - 3 THEN 'albatross'
+           WHEN hole_scores.strokes = holes.par - 2 THEN 'eagle'
+           WHEN hole_scores.strokes = holes.par - 1 THEN 'birdie'
+           WHEN hole_scores.strokes = holes.par THEN 'par'
+           WHEN hole_scores.strokes = holes.par + 1 THEN 'bogey'
+           WHEN hole_scores.strokes = holes.par + 2 THEN 'doubleBogey'
+           ELSE 'worse'
+         END`;
+
+function emptyDistribution(): ScoreDistribution {
+  return {
+    ace: 0,
+    albatross: 0,
+    eagle: 0,
+    birdie: 0,
+    par: 0,
+    bogey: 0,
+    doubleBogey: 0,
+    worse: 0,
+  };
+}
+
+// Undefined means "no filter given" (the field is everyone). An explicit,
+// possibly-empty list means the caller has chosen exactly who's in the
+// field, including choosing nobody.
+function parsePlayerIdsParam(raw: string | undefined): number[] | null {
+  if (raw === undefined) {
+    return null;
+  }
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n > 0);
+}
+
 async function countPlayerRounds(db: D1Database, playerId: number) {
   const row = await db
     .prepare(
@@ -352,21 +392,8 @@ playersRoute.get("/:playerId/score-distribution", async (c) => {
     return c.json({ error: "Player not found" }, 404);
   }
 
-  // Buckets mirror src/rounds/scoreColor.ts's scoreOutcome(): an ace takes
-  // priority over how far under par it is, then it's purely relative to par.
   const { results } = await c.env.DB.prepare(
-    `SELECT
-       CASE
-         WHEN hole_scores.strokes = 1 THEN 'ace'
-         WHEN hole_scores.strokes <= holes.par - 3 THEN 'albatross'
-         WHEN hole_scores.strokes = holes.par - 2 THEN 'eagle'
-         WHEN hole_scores.strokes = holes.par - 1 THEN 'birdie'
-         WHEN hole_scores.strokes = holes.par THEN 'par'
-         WHEN hole_scores.strokes = holes.par + 1 THEN 'bogey'
-         WHEN hole_scores.strokes = holes.par + 2 THEN 'doubleBogey'
-         ELSE 'worse'
-       END AS bucket,
-       COUNT(*) AS count
+    `SELECT ${SCORE_BUCKET_CASE} AS bucket, COUNT(*) AS count
      FROM hole_scores
      JOIN rounds ON rounds.id = hole_scores.round_id
      JOIN holes ON holes.id = hole_scores.hole_id
@@ -379,14 +406,7 @@ playersRoute.get("/:playerId/score-distribution", async (c) => {
     .all<ScoreBucketRow>();
 
   const distribution: ScoreDistribution = {
-    ace: 0,
-    albatross: 0,
-    eagle: 0,
-    birdie: 0,
-    par: 0,
-    bogey: 0,
-    doubleBogey: 0,
-    worse: 0,
+    ...emptyDistribution(),
   };
   for (const row of results) {
     distribution[row.bucket] = row.count;
@@ -423,24 +443,29 @@ playersRoute.get("/:playerId/holes/:holeId/breakdown", async (c) => {
     return c.json({ error: "Hole not found" }, 404);
   }
 
+  // undefined fieldPlayerIds means no filter given (the field is everyone);
+  // an explicit, possibly-empty list means the caller chose exactly who's
+  // in the field, including choosing nobody.
+  const fieldPlayerIds = parsePlayerIdsParam(c.req.query("fieldPlayerIds"));
+  const fieldFilterSql =
+    fieldPlayerIds === null
+      ? ""
+      : fieldPlayerIds.length === 0
+        ? "AND 0 = 1"
+        : `AND hole_scores.player_id IN (${fieldPlayerIds.map(() => "?").join(", ")})`;
+  const fieldFilterBinds = fieldPlayerIds ?? [];
+
   // Only rounds that count and are actually finished, and only strokes the
   // player explicitly entered (see TotalsList.tsx's same rule) — a hole
-  // nobody touched shouldn't pad either average with its seeded default.
-  const [{ results: bucketRows }, { results: throwRows }, allPlayersAvgRow] =
-    await Promise.all([
-      c.env.DB.prepare(
-        `SELECT
-           CASE
-             WHEN hole_scores.strokes = 1 THEN 'ace'
-             WHEN hole_scores.strokes <= holes.par - 3 THEN 'albatross'
-             WHEN hole_scores.strokes = holes.par - 2 THEN 'eagle'
-             WHEN hole_scores.strokes = holes.par - 1 THEN 'birdie'
-             WHEN hole_scores.strokes = holes.par THEN 'par'
-             WHEN hole_scores.strokes = holes.par + 1 THEN 'bogey'
-             WHEN hole_scores.strokes = holes.par + 2 THEN 'doubleBogey'
-             ELSE 'worse'
-           END AS bucket,
-           COUNT(*) AS count
+  // nobody touched shouldn't pad any average with its seeded default.
+  const [
+    { results: playerBucketRows },
+    { results: throwRows },
+    { results: fieldBucketRows },
+    fieldAvgRow,
+  ] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT ${SCORE_BUCKET_CASE} AS bucket, COUNT(*) AS count
          FROM hole_scores
          JOIN rounds ON rounds.id = hole_scores.round_id
          JOIN holes ON holes.id = hole_scores.hole_id
@@ -450,11 +475,11 @@ playersRoute.get("/:playerId/holes/:holeId/breakdown", async (c) => {
            AND rounds.completed_at IS NOT NULL
            AND rounds.counting = 1
          GROUP BY bucket`,
-      )
-        .bind(playerId, holeId)
-        .all<ScoreBucketRow>(),
-      c.env.DB.prepare(
-        `SELECT hole_scores.round_id,
+    )
+      .bind(playerId, holeId)
+      .all<ScoreBucketRow>(),
+    c.env.DB.prepare(
+      `SELECT hole_scores.round_id,
                 COALESCE(rounds.completed_at, rounds.created_at) AS date,
                 hole_scores.strokes, hole_scores.penalties
          FROM hole_scores
@@ -465,34 +490,45 @@ playersRoute.get("/:playerId/holes/:holeId/breakdown", async (c) => {
            AND rounds.completed_at IS NOT NULL
            AND rounds.counting = 1
          ORDER BY date DESC`,
-      )
-        .bind(playerId, holeId)
-        .all<HoleThrowRow>(),
-      c.env.DB.prepare(
-        `SELECT AVG(hole_scores.strokes) AS avg_strokes
+    )
+      .bind(playerId, holeId)
+      .all<HoleThrowRow>(),
+    c.env.DB.prepare(
+      `SELECT ${SCORE_BUCKET_CASE} AS bucket, COUNT(*) AS count
+         FROM hole_scores
+         JOIN rounds ON rounds.id = hole_scores.round_id
+         JOIN holes ON holes.id = hole_scores.hole_id
+         WHERE hole_scores.hole_id = ?
+           AND hole_scores.recorded = 1
+           AND rounds.completed_at IS NOT NULL
+           AND rounds.counting = 1
+           ${fieldFilterSql}
+         GROUP BY bucket`,
+    )
+      .bind(holeId, ...fieldFilterBinds)
+      .all<ScoreBucketRow>(),
+    c.env.DB.prepare(
+      `SELECT AVG(hole_scores.strokes) AS avg_strokes
          FROM hole_scores
          JOIN rounds ON rounds.id = hole_scores.round_id
          WHERE hole_scores.hole_id = ?
            AND hole_scores.recorded = 1
            AND rounds.completed_at IS NOT NULL
-           AND rounds.counting = 1`,
-      )
-        .bind(holeId)
-        .first<{ avg_strokes: number | null }>(),
-    ]);
+           AND rounds.counting = 1
+           ${fieldFilterSql}`,
+    )
+      .bind(holeId, ...fieldFilterBinds)
+      .first<{ avg_strokes: number | null }>(),
+  ]);
 
-  const distribution: ScoreDistribution = {
-    ace: 0,
-    albatross: 0,
-    eagle: 0,
-    birdie: 0,
-    par: 0,
-    bogey: 0,
-    doubleBogey: 0,
-    worse: 0,
-  };
-  for (const row of bucketRows) {
-    distribution[row.bucket] = row.count;
+  const playerDistribution = emptyDistribution();
+  for (const row of playerBucketRows) {
+    playerDistribution[row.bucket] = row.count;
+  }
+
+  const fieldDistribution = emptyDistribution();
+  for (const row of fieldBucketRows) {
+    fieldDistribution[row.bucket] = row.count;
   }
 
   const playerAvgStrokes =
@@ -512,7 +548,8 @@ playersRoute.get("/:playerId/holes/:holeId/breakdown", async (c) => {
           layoutName: hole.layout_name,
           courseName: hole.course_name,
         },
-        distribution,
+        playerDistribution,
+        fieldDistribution,
         throws: throwRows.map((row) => ({
           roundId: row.round_id,
           date: row.date,
@@ -520,7 +557,7 @@ playersRoute.get("/:playerId/holes/:holeId/breakdown", async (c) => {
           penalties: row.penalties,
         })),
         playerAvgStrokes,
-        allPlayersAvgStrokes: allPlayersAvgRow?.avg_strokes ?? null,
+        fieldAvgStrokes: fieldAvgRow?.avg_strokes ?? null,
       },
     }),
   );

@@ -88,10 +88,11 @@ export const holeBreakdownSchema = z.object({
     layoutName: z.string(),
     courseName: z.string(),
   }),
-  distribution: scoreDistributionSchema,
+  playerDistribution: scoreDistributionSchema,
+  fieldDistribution: scoreDistributionSchema,
   throws: z.array(holeThrowSchema),
   playerAvgStrokes: z.number().nullable(),
-  allPlayersAvgStrokes: z.number().nullable(),
+  fieldAvgStrokes: z.number().nullable(),
 });
 export type HoleBreakdown = z.infer<typeof holeBreakdownSchema>;
 

@@ -90,34 +90,35 @@ const holes = [
   },
 ];
 
+const players = [
+  { id: 1, name: "Alice", createdAt: "", roundCount: 2, claimedByUserId: null },
+  { id: 2, name: "Bob", createdAt: "", roundCount: 2, claimedByUserId: null },
+];
+
 describe("HoleBreakdownPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(playersApi.listPlayers).mockResolvedValue({
-      players: [
-        {
-          id: 1,
-          name: "Alice",
-          createdAt: "",
-          roundCount: 2,
-          claimedByUserId: null,
-        },
-      ],
-    });
+    vi.mocked(playersApi.listPlayers).mockResolvedValue({ players });
     vi.mocked(playersApi.getPlayerStats).mockResolvedValue({ holes });
   });
 
-  it("shows the course, layout, hole, the comparison to the field, the distribution, and the throws", async () => {
+  it("shows the course, layout, hole, field distribution, player distribution, and throws", async () => {
     vi.mocked(playersApi.getHoleBreakdown).mockResolvedValue({
       breakdown: {
         hole: aHole({ distanceMeters: 90 }),
-        distribution: { ...emptyDistribution, birdie: 1, par: 1 },
+        playerDistribution: { ...emptyDistribution, birdie: 1, par: 1 },
+        fieldDistribution: {
+          ...emptyDistribution,
+          birdie: 1,
+          par: 1,
+          bogey: 1,
+        },
         throws: [
           { roundId: 1, date: "2026-08-01 10:00:00", strokes: 2, penalties: 0 },
           { roundId: 2, date: "2026-08-05 10:00:00", strokes: 3, penalties: 1 },
         ],
         playerAvgStrokes: 2.5,
-        allPlayersAvgStrokes: 3,
+        fieldAvgStrokes: 3,
       },
     });
 
@@ -126,51 +127,22 @@ describe("HoleBreakdownPage", () => {
     expect(await screen.findByText("Maple Hill — Blue")).toBeInTheDocument();
     expect(await screen.findByText("Hole 1")).toBeInTheDocument();
     expect(screen.getByText("Par 3 · 90 m")).toBeInTheDocument();
-    expect(screen.getByText("2.5")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText("-0.5")).toBeInTheDocument();
-    expect(screen.getByText("Throw distribution")).toBeInTheDocument();
+    expect(screen.getByText("The field")).toBeInTheDocument();
+    expect(screen.getByText("Alice throws")).toBeInTheDocument();
+    expect(screen.getByText("3.0")).toBeInTheDocument(); // field average
+    expect(screen.getByText("2.5")).toBeInTheDocument(); // player average
     expect(screen.getByText("+1 pen.")).toBeInTheDocument();
   });
 
-  it("colors a rounded-to-even diff the same regardless of its unrounded sign", async () => {
-    function aBreakdown(
-      playerAvgStrokes: number,
-      allPlayersAvgStrokes: number,
-    ) {
-      return {
-        breakdown: {
-          hole: aHole(),
-          distribution: emptyDistribution,
-          throws: [],
-          playerAvgStrokes,
-          allPlayersAvgStrokes,
-        },
-      };
-    }
-    vi.mocked(playersApi.getHoleBreakdown)
-      .mockResolvedValueOnce(aBreakdown(2.96, 3))
-      .mockResolvedValueOnce(aBreakdown(3.04, 3));
-
-    const first = renderPage();
-    const belowColor = getComputedStyle(await first.findByText("even")).color;
-    first.unmount();
-
-    const second = renderPage();
-    const aboveColor = getComputedStyle(await second.findByText("even")).color;
-    second.unmount();
-
-    expect(belowColor).toBe(aboveColor);
-  });
-
-  it("shows an empty state when the player hasn't played this hole", async () => {
+  it("shows an empty state for the player and the field independently", async () => {
     vi.mocked(playersApi.getHoleBreakdown).mockResolvedValue({
       breakdown: {
         hole: aHole(),
-        distribution: emptyDistribution,
+        playerDistribution: emptyDistribution,
+        fieldDistribution: { ...emptyDistribution, par: 1 },
         throws: [],
         playerAvgStrokes: null,
-        allPlayersAvgStrokes: 3,
+        fieldAvgStrokes: 3,
       },
     });
 
@@ -179,7 +151,38 @@ describe("HoleBreakdownPage", () => {
     expect(
       await screen.findByText("No counting throws recorded on this hole yet."),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Throw distribution")).not.toBeInTheDocument();
+    expect(screen.getByText(/Field average:/)).toBeInTheDocument();
+    expect(screen.getByText("3.0")).toBeInTheDocument();
+  });
+
+  it("lets you configure the field and refetches with the selected players", async () => {
+    vi.mocked(playersApi.getHoleBreakdown).mockResolvedValue({
+      breakdown: {
+        hole: aHole(),
+        playerDistribution: emptyDistribution,
+        fieldDistribution: emptyDistribution,
+        throws: [],
+        playerAvgStrokes: null,
+        fieldAvgStrokes: null,
+      },
+    });
+    const user = userEvent.setup();
+
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(
+      screen.getByRole("button", { name: "configure the field" }),
+    );
+    expect(await screen.findByText("Configure the field")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("checkbox", { name: "Bob" }));
+    await user.click(screen.getByRole("button", { name: "Apply" }));
+
+    expect(playersApi.getHoleBreakdown).toHaveBeenLastCalledWith(1, 100, [1]);
+    expect(
+      await screen.findByText("The field (1 selected)"),
+    ).toBeInTheDocument();
   });
 
   it("navigates to the next hole and disables Next on the last hole", async () => {
@@ -190,10 +193,11 @@ describe("HoleBreakdownPage", () => {
             id: holeId,
             number: holes.find((h) => h.holeId === holeId)!.number,
           }),
-          distribution: emptyDistribution,
+          playerDistribution: emptyDistribution,
+          fieldDistribution: emptyDistribution,
           throws: [],
           playerAvgStrokes: null,
-          allPlayersAvgStrokes: null,
+          fieldAvgStrokes: null,
         },
       }),
     );
@@ -214,10 +218,11 @@ describe("HoleBreakdownPage", () => {
     vi.mocked(playersApi.getHoleBreakdown).mockResolvedValue({
       breakdown: {
         hole: aHole(),
-        distribution: emptyDistribution,
+        playerDistribution: emptyDistribution,
+        fieldDistribution: emptyDistribution,
         throws: [],
         playerAvgStrokes: null,
-        allPlayersAvgStrokes: null,
+        fieldAvgStrokes: null,
       },
     });
 

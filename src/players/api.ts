@@ -107,8 +107,13 @@ export async function getScoreDistribution(
 export async function getHoleBreakdown(
   playerId: number,
   holeId: number,
+  fieldPlayerIds?: number[],
 ): Promise<HoleBreakdownResponse> {
+  const query =
+    fieldPlayerIds !== undefined
+      ? `?fieldPlayerIds=${fieldPlayerIds.join(",")}`
+      : "";
   return holeBreakdownResponseSchema.parse(
-    await request(`/api/players/${playerId}/holes/${holeId}/breakdown`),
+    await request(`/api/players/${playerId}/holes/${holeId}/breakdown${query}`),
   );
 }

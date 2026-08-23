@@ -88,7 +88,17 @@ function aHoleBreakdown(overrides: Partial<HoleBreakdown> = {}): HoleBreakdown {
       layoutName: "Blue",
       courseName: "Maple Hill",
     },
-    distribution: {
+    playerDistribution: {
+      ace: 0,
+      albatross: 0,
+      eagle: 0,
+      birdie: 0,
+      par: 0,
+      bogey: 0,
+      doubleBogey: 0,
+      worse: 0,
+    },
+    fieldDistribution: {
       ace: 0,
       albatross: 0,
       eagle: 0,
@@ -100,7 +110,7 @@ function aHoleBreakdown(overrides: Partial<HoleBreakdown> = {}): HoleBreakdown {
     },
     throws: [],
     playerAvgStrokes: null,
-    allPlayersAvgStrokes: null,
+    fieldAvgStrokes: null,
     ...overrides,
   });
 }
@@ -225,6 +235,24 @@ describe("players api", () => {
     expect(breakdown).toEqual(aHoleBreakdown({ playerAvgStrokes: 2.5 }));
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/players/1/holes/10/breakdown",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+  });
+
+  it("passes selected field player ids as a query parameter", async () => {
+    const fetchMock = mockFetchOnce({ breakdown: aHoleBreakdown() });
+    await getHoleBreakdown(1, 10, [2, 3]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/players/1/holes/10/breakdown?fieldPlayerIds=2,3",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+  });
+
+  it("sends an empty fieldPlayerIds when an explicit empty field is chosen", async () => {
+    const fetchMock = mockFetchOnce({ breakdown: aHoleBreakdown() });
+    await getHoleBreakdown(1, 10, []);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/players/1/holes/10/breakdown?fieldPlayerIds=",
       expect.objectContaining({ headers: expect.any(Headers) }),
     );
   });

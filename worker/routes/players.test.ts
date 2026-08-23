@@ -974,7 +974,7 @@ describe("hole breakdown", () => {
     return round;
   }
 
-  it("returns this player's distribution and throws, plus both averages compared to the field", async () => {
+  it("returns this player's distribution and throws, plus the field's distribution and average", async () => {
     const { courseId, layoutId } = await seedCourse(env, {
       courseName: "Maple Hill",
       layoutName: "Blue",
@@ -1008,7 +1008,7 @@ describe("hole breakdown", () => {
       layoutName: "Blue",
       courseName: "Maple Hill",
     });
-    expect(breakdown.distribution).toEqual({
+    expect(breakdown.playerDistribution).toEqual({
       ace: 0,
       albatross: 0,
       eagle: 0,
@@ -1018,10 +1018,98 @@ describe("hole breakdown", () => {
       doubleBogey: 0,
       worse: 0,
     });
+    // The field is everyone by default: Alice's birdie + par, Bob's bogey,
+    // plus the par Bob's second round locked in on completion for the hole
+    // he never touched (see migration 0022's backfill and the /complete
+    // handler that marks remaining holes recorded).
+    expect(breakdown.fieldDistribution).toEqual({
+      ace: 0,
+      albatross: 0,
+      eagle: 0,
+      birdie: 1,
+      par: 2,
+      bogey: 1,
+      doubleBogey: 0,
+      worse: 0,
+    });
     expect(breakdown.throws.map((t) => t.strokes).sort()).toEqual([2, 3]);
     expect(breakdown.playerAvgStrokes).toBe(2.5); // (2 + 3) / 2
-    // Field average: Alice's 2 + 3, plus Bob's 4, across 3 throws = 3.
-    expect(breakdown.allPlayersAvgStrokes).toBe(3);
+    // Field average: Alice's 2 + 3, Bob's 4, and Bob's locked-in default
+    // par (3) from his second round, across 4 throws = 3.
+    expect(breakdown.fieldAvgStrokes).toBe(3);
+  });
+
+  it("restricts the field to the selected player ids", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const alice = await createPlayer("Alice");
+    const bob = await createPlayer("Bob");
+    const carol = await createPlayer("Carol");
+
+    const round = await playRoundWithStrokes(
+      courseId,
+      layoutId,
+      [alice.id, bob.id, carol.id],
+      { [alice.id]: { 1: 2 }, [bob.id]: { 1: 4 }, [carol.id]: { 1: 5 } },
+    );
+    const holeId = round.holes[0].id;
+
+    // Head-to-head: only Bob counts toward the field, excluding Carol.
+    const { breakdown } = await json(
+      await request(
+        `/api/players/${alice.id}/holes/${holeId}/breakdown?fieldPlayerIds=${bob.id}`,
+      ),
+      holeBreakdownResponseSchema,
+    );
+
+    expect(breakdown.fieldAvgStrokes).toBe(4);
+    expect(breakdown.fieldDistribution).toEqual({
+      ace: 0,
+      albatross: 0,
+      eagle: 0,
+      birdie: 0,
+      par: 0,
+      bogey: 1,
+      doubleBogey: 0,
+      worse: 0,
+    });
+  });
+
+  it("returns an empty field when fieldPlayerIds is explicitly empty", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const alice = await createPlayer("Alice");
+    const round = await playRoundWithStrokes(courseId, layoutId, [alice.id], {
+      [alice.id]: { 1: 3 },
+    });
+    const holeId = round.holes[0].id;
+
+    const { breakdown } = await json(
+      await request(
+        `/api/players/${alice.id}/holes/${holeId}/breakdown?fieldPlayerIds=`,
+      ),
+      holeBreakdownResponseSchema,
+    );
+
+    expect(breakdown.fieldAvgStrokes).toBeNull();
+    expect(breakdown.fieldDistribution).toEqual({
+      ace: 0,
+      albatross: 0,
+      eagle: 0,
+      birdie: 0,
+      par: 0,
+      bogey: 0,
+      doubleBogey: 0,
+      worse: 0,
+    });
+    // The player's own distribution is unaffected by the field filter.
+    expect(breakdown.playerDistribution.par).toBe(1);
   });
 
   it("excludes non-counting and in-progress rounds from both averages", async () => {
@@ -1085,7 +1173,7 @@ describe("hole breakdown", () => {
     expect(breakdown.throws).toEqual([]);
     expect(breakdown.playerAvgStrokes).toBeNull();
     // Only Alice's counting, completed, recorded throw (3) counts.
-    expect(breakdown.allPlayersAvgStrokes).toBe(3);
+    expect(breakdown.fieldAvgStrokes).toBe(3);
   });
 
   it("excludes a score still marked unrecorded on an already-completed round", async () => {
@@ -1120,7 +1208,7 @@ describe("hole breakdown", () => {
     );
     expect(breakdown.throws).toEqual([]);
     expect(breakdown.playerAvgStrokes).toBeNull();
-    expect(breakdown.allPlayersAvgStrokes).toBe(3); // Only Alice's throw counts.
+    expect(breakdown.fieldAvgStrokes).toBe(3); // Only Alice's throw counts.
   });
 
   it("returns nulls and an empty throw list when the player has never played this hole", async () => {
@@ -1142,7 +1230,7 @@ describe("hole breakdown", () => {
     );
     expect(breakdown.throws).toEqual([]);
     expect(breakdown.playerAvgStrokes).toBeNull();
-    expect(breakdown.allPlayersAvgStrokes).toBe(3); // Bob's throw still counts.
+    expect(breakdown.fieldAvgStrokes).toBe(3); // Bob's throw still counts.
   });
 
   it("404s for a player that doesn't exist", async () => {
