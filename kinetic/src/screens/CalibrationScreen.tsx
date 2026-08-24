@@ -1,101 +1,116 @@
-import { useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useState } from "react";
 import { useCamera } from "../camera/useCamera";
 import { PROCESSING_HEIGHT, PROCESSING_WIDTH } from "../detection/constants";
-import { drawVideoFrameCover } from "../detection/drawVideoFrame";
+import { FrameAnalyzer } from "../detection/frameAnalyzer";
+import type { FrameSample } from "../detection/types";
 import { saveCalibration } from "../speed/calibration";
 import { loadDiscDiameterMm } from "../speed/settings";
 
-interface Box {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-}
+// How many recent blob-size measurements to keep for the stability check.
+const WINDOW_SIZE = 8;
+// (max - min) / average across the window must be within this fraction to
+// count as "steady" — a moving/wobbling disc will exceed it.
+const STABILITY_TOLERANCE = 0.1;
+// Tolerate a few dropped frames (motion blur, a brief detector miss)
+// before giving up and starting the window over.
+const MAX_CONSECUTIVE_MISSES = 5;
+const UI_UPDATE_INTERVAL_MS = 100;
 
-function toCanvasPoint(
-  canvas: HTMLCanvasElement,
-  clientX: number,
-  clientY: number,
-) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  return {
-    x: Math.min(Math.max((clientX - rect.left) * scaleX, 0), canvas.width),
-    y: Math.min(Math.max((clientY - rect.top) * scaleY, 0), canvas.height),
-  };
+interface Reading {
+  sample: FrameSample;
+  averageMajorAxisPx: number;
+  stable: boolean;
 }
 
 export function CalibrationScreen({ onDone }: { onDone: () => void }) {
   const { videoRef, status, error } = useCamera();
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [distanceCm, setDistanceCm] = useState("100");
-  const [captured, setCaptured] = useState(false);
-  const [box, setBox] = useState<Box | null>(null);
-  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(
-    null,
-  );
-  const [saved, setSaved] = useState(false);
+  const [reading, setReading] = useState<Reading | null>(null);
+  const [savedFocalLength, setSavedFocalLength] = useState<number | null>(null);
 
-  const capture = () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    // Same "cover" mapping the live preview uses (and that live scanning
-    // measures against) — otherwise what you see while framing the disc
-    // wouldn't match what actually gets measured here.
-    drawVideoFrameCover(ctx, video, PROCESSING_WIDTH, PROCESSING_HEIGHT);
-    setCaptured(true);
-    setBox(null);
-    setSaved(false);
-  };
+  // Continuously watches the live feed with the same motion detector the
+  // live scanner uses. Moving the disc into frame is exactly the motion
+  // signal it's built to catch — and once it's there, the detector's
+  // background model never re-absorbs it (see frameAnalyzer.ts), so
+  // holding the disc still keeps it tracked instead of making it
+  // disappear. No manual tracing needed.
+  useEffect(() => {
+    if (status !== "ready") return;
 
-  const retake = () => {
-    setCaptured(false);
-    setBox(null);
-    setSaved(false);
-  };
+    const analyzer = new FrameAnalyzer();
+    const readingsWindow: number[] = [];
+    let misses = 0;
+    let lastUiUpdate = 0;
+    let frameId: number;
 
-  const handlePointerDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (!captured || !canvasRef.current) return;
-    const p = toCanvasPoint(canvasRef.current, e.clientX, e.clientY);
-    setDragStart(p);
-    setBox({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
-  };
+    const tick = () => {
+      const video = videoRef.current;
+      if (video) {
+        const now = performance.now();
+        const sample = analyzer.sample(video, now);
 
-  const handlePointerMove = (e: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (!dragStart || !canvasRef.current) return;
-    const p = toCanvasPoint(canvasRef.current, e.clientX, e.clientY);
-    setBox({ x1: dragStart.x, y1: dragStart.y, x2: p.x, y2: p.y });
-  };
+        if (sample) {
+          misses = 0;
+          readingsWindow.push(sample.majorAxisPx);
+          if (readingsWindow.length > WINDOW_SIZE) readingsWindow.shift();
+        } else if (++misses > MAX_CONSECUTIVE_MISSES) {
+          readingsWindow.length = 0;
+        }
 
-  const handlePointerUp = () => setDragStart(null);
+        if (now - lastUiUpdate > UI_UPDATE_INTERVAL_MS) {
+          lastUiUpdate = now;
+          if (!sample || readingsWindow.length === 0) {
+            setReading(null);
+          } else {
+            const average =
+              readingsWindow.reduce((a, b) => a + b, 0) / readingsWindow.length;
+            const max = Math.max(...readingsWindow);
+            const min = Math.min(...readingsWindow);
+            const stable =
+              readingsWindow.length === WINDOW_SIZE &&
+              (max - min) / average <= STABILITY_TOLERANCE;
+            setReading({ sample, averageMajorAxisPx: average, stable });
+          }
+        }
+      }
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
 
-  const boxWidthPx = box ? Math.abs(box.x2 - box.x1) : 0;
+    return () => cancelAnimationFrame(frameId);
+  }, [status, videoRef]);
+
   const distanceM = Number(distanceCm) / 100;
-  const discDiameterM = loadDiscDiameterMm() / 1000;
-  const canSave = boxWidthPx >= 4 && distanceM > 0;
-  const focalLengthPx = canSave
-    ? (boxWidthPx * distanceM) / discDiameterM
-    : null;
+  const discDiameterMm = loadDiscDiameterMm();
+  const discDiameterM = discDiameterMm / 1000;
+  const canSave = !!reading?.stable && distanceM > 0;
 
   const save = () => {
-    if (!focalLengthPx) return;
+    if (!reading || !canSave) return;
+    const focalLengthPx =
+      (reading.averageMajorAxisPx * distanceM) / discDiameterM;
     saveCalibration({ focalLengthPx });
-    setSaved(true);
+    setSavedFocalLength(focalLengthPx);
   };
 
-  const boxStyle = box
+  const overlayStyle = reading
     ? {
-        left: `${(Math.min(box.x1, box.x2) / PROCESSING_WIDTH) * 100}%`,
-        top: `${(Math.min(box.y1, box.y2) / PROCESSING_HEIGHT) * 100}%`,
-        width: `${(Math.abs(box.x2 - box.x1) / PROCESSING_WIDTH) * 100}%`,
-        height: `${(Math.abs(box.y2 - box.y1) / PROCESSING_HEIGHT) * 100}%`,
+        left: `${((reading.sample.cx - reading.sample.width / 2) / PROCESSING_WIDTH) * 100}%`,
+        top: `${((reading.sample.cy - reading.sample.height / 2) / PROCESSING_HEIGHT) * 100}%`,
+        width: `${(reading.sample.width / PROCESSING_WIDTH) * 100}%`,
+        height: `${(reading.sample.height / PROCESSING_HEIGHT) * 100}%`,
+        borderColor: reading.stable ? "#38e0c4" : "#f5c065",
+        background: reading.stable
+          ? "rgba(56, 224, 196, 0.2)"
+          : "rgba(245, 192, 101, 0.15)",
       }
     : null;
+
+  const statusText = !reading
+    ? "No disc detected — move it into view"
+    : reading.stable
+      ? `Locked on — ${reading.averageMajorAxisPx.toFixed(0)}px across`
+      : `Detecting… ${reading.averageMajorAxisPx.toFixed(0)}px, hold it steady`;
 
   return (
     <main style={styles.main}>
@@ -105,8 +120,8 @@ export function CalibrationScreen({ onDone }: { onDone: () => void }) {
       <h1 style={styles.h1}>Calibrate camera</h1>
       <p style={styles.help}>
         Hold the disc flat, facing the camera, at a distance you can measure
-        (e.g. a tape measure or a fixed mark). Enter that distance, tap Capture,
-        then drag a box across the disc's width in the photo.
+        (e.g. a tape measure or a fixed mark). Enter that distance, then hold
+        the disc steady in view — once it locks on, tap "Use this measurement."
       </p>
 
       {status === "error" && <p style={styles.error}>{error}</p>}
@@ -122,65 +137,31 @@ export function CalibrationScreen({ onDone }: { onDone: () => void }) {
           onChange={(e) => setDistanceCm(e.target.value)}
         />
       </label>
+      <p style={styles.help}>
+        Using disc diameter: {discDiameterMm}mm (change in Settings).
+      </p>
 
       <div style={styles.frame}>
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          style={{
-            ...styles.videoOrCanvas,
-            display: captured ? "none" : "block",
-          }}
-        />
-        <canvas
-          ref={canvasRef}
-          width={PROCESSING_WIDTH}
-          height={PROCESSING_HEIGHT}
-          style={{
-            ...styles.videoOrCanvas,
-            display: captured ? "block" : "none",
-            touchAction: "none",
-          }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-        />
-        {captured && boxStyle && <div style={{ ...styles.box, ...boxStyle }} />}
+        <video ref={videoRef} playsInline muted style={styles.video} />
+        {overlayStyle && <div style={{ ...styles.box, ...overlayStyle }} />}
       </div>
 
-      {!captured ? (
-        <button
-          style={styles.primaryButton}
-          onClick={capture}
-          disabled={status !== "ready"}
-        >
-          Capture
-        </button>
-      ) : (
-        <>
-          <p style={styles.help}>
-            Drag a box across the disc's width.
-            {boxWidthPx > 0 && ` Box width: ${boxWidthPx.toFixed(0)}px.`}
-          </p>
-          <div style={styles.row}>
-            <button style={styles.secondaryButton} onClick={retake}>
-              Retake
-            </button>
-            <button
-              style={styles.primaryButton}
-              onClick={save}
-              disabled={!canSave}
-            >
-              Save calibration
-            </button>
-          </div>
-        </>
-      )}
+      <p
+        style={{
+          ...styles.status,
+          color: reading?.stable ? "#38e0c4" : "#9fb3ac",
+        }}
+      >
+        {statusText}
+      </p>
 
-      {saved && focalLengthPx && (
+      <button style={styles.primaryButton} onClick={save} disabled={!canSave}>
+        Use this measurement
+      </button>
+
+      {savedFocalLength !== null && (
         <p style={styles.success}>
-          Saved — focal length: {focalLengthPx.toFixed(1)}px. You can go back
+          Saved — focal length: {savedFocalLength.toFixed(1)}px. You can go back
           and start scanning.
         </p>
       )}
@@ -211,7 +192,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     gap: "0.25rem",
-    margin: "1rem 0",
+    margin: "1rem 0 0.25rem",
     fontSize: "0.9rem",
   },
   input: {
@@ -229,39 +210,25 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#000",
     borderRadius: 8,
     overflow: "hidden",
+    marginTop: "0.75rem",
   },
-  videoOrCanvas: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-  },
+  video: { width: "100%", height: "100%", objectFit: "cover" },
   box: {
     position: "absolute",
-    border: "2px solid #38e0c4",
-    background: "rgba(56, 224, 196, 0.2)",
+    border: "2px solid",
     pointerEvents: "none",
+    transition: "left 0.1s, top 0.1s, width 0.1s, height 0.1s",
   },
-  row: { display: "flex", gap: "0.75rem", marginTop: "0.75rem" },
+  status: { textAlign: "center", margin: "0.75rem 0" },
   primaryButton: {
-    marginTop: "1rem",
-    padding: "0.75rem 1.25rem",
-    fontSize: "1rem",
+    width: "100%",
+    padding: "0.9rem",
+    fontSize: "1.05rem",
     fontWeight: 600,
     borderRadius: 999,
     border: "none",
     background: "#38e0c4",
     color: "#0e1e2a",
-    flex: 1,
-  },
-  secondaryButton: {
-    marginTop: "1rem",
-    padding: "0.75rem 1.25rem",
-    fontSize: "1rem",
-    borderRadius: 999,
-    border: "1px solid #38e0c4",
-    background: "transparent",
-    color: "#38e0c4",
-    flex: 1,
   },
   success: { color: "#38e0c4", marginTop: "1rem" },
 };
