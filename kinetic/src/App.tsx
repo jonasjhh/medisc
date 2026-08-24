@@ -1,22 +1,25 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { CalibrationScreen } from "./screens/CalibrationScreen";
+import { ScanScreen } from "./screens/ScanScreen";
+import { SettingsScreen } from "./screens/SettingsScreen";
+
+type Screen = "scan" | "settings" | "calibration";
 
 export function App() {
-  const [health, setHealth] = useState("checking...");
+  const [screen, setScreen] = useState<Screen>("scan");
 
-  useEffect(() => {
-    fetch("/api/health")
-      .then((res) => res.json())
-      .then((data: { status: string }) => setHealth(data.status))
-      .catch(() => setHealth("unreachable"));
-  }, []);
+  if (screen === "settings") {
+    return (
+      <SettingsScreen
+        onBack={() => setScreen("scan")}
+        onCalibrate={() => setScreen("calibration")}
+      />
+    );
+  }
 
-  return (
-    <main style={{ fontFamily: "sans-serif", padding: "2rem" }}>
-      <h1>Kinetic</h1>
-      <p>
-        Placeholder skeleton — phone sensor and camera integrations go here.
-      </p>
-      <p>Worker health: {health}</p>
-    </main>
-  );
+  if (screen === "calibration") {
+    return <CalibrationScreen onDone={() => setScreen("settings")} />;
+  }
+
+  return <ScanScreen onOpenSettings={() => setScreen("settings")} />;
 }
