@@ -103,9 +103,9 @@ export function ScanScreen({ onOpenSettings }: { onOpenSettings: () => void }) {
 
       {result && (
         <div style={styles.resultCard}>
-          <div style={styles.resultSpeed}>{result.mph.toFixed(1)} mph</div>
+          <div style={styles.resultSpeed}>{result.kph.toFixed(1)} km/h</div>
           <div style={styles.resultSub}>
-            {result.kph.toFixed(1)} km/h · {result.frameCount} frames
+            {result.mph.toFixed(1)} mph · {result.frameCount} frames
           </div>
         </div>
       )}
