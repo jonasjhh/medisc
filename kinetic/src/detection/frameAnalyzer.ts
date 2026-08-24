@@ -1,8 +1,23 @@
 import { PROCESSING_HEIGHT, PROCESSING_WIDTH } from "./constants";
+import { drawVideoFrameCover } from "./drawVideoFrame";
 import type { FrameSample } from "./types";
 
 const DIFF_THRESHOLD = 28; // per-pixel luma change to count as "moved"
-const MIN_FOREGROUND_PIXELS = 25; // ignore sensor noise / tiny flicker
+const MIN_FOREGROUND_PIXELS = 40; // ignore sensor noise / tiny flicker
+
+// A disc crossing overhead should only ever cover a modest patch of the
+// frame. Real cameras constantly hunt for exposure/white-balance, and when
+// that shifts the *entire* frame brightens or darkens at once — which
+// without this cap looks exactly like one huge "object" filling almost the
+// whole frame, triggering a capture on nothing and producing garbage
+// centroid/width numbers. Anything this big is treated as noise instead.
+const MAX_FOREGROUND_FRACTION = 0.2;
+const MAX_FOREGROUND_PIXELS = Math.round(
+  PROCESSING_WIDTH * PROCESSING_HEIGHT * MAX_FOREGROUND_FRACTION,
+);
+const MAX_BOX_FRACTION = 0.75;
+const MAX_BOX_WIDTH = Math.round(PROCESSING_WIDTH * MAX_BOX_FRACTION);
+const MAX_BOX_HEIGHT = Math.round(PROCESSING_HEIGHT * MAX_BOX_FRACTION);
 
 // Frame-differencing motion detector: draws each video frame onto a small
 // canvas, compares it (in grayscale) against the previous frame, and
@@ -27,14 +42,15 @@ export class FrameAnalyzer {
 
   /**
    * Call once per animation frame. Returns null when the video hasn't
-   * produced a new frame yet, or when nothing moved enough to matter.
+   * produced a new frame yet, or when nothing moved enough to matter (or
+   * too much — see MAX_FOREGROUND_PIXELS above).
    */
   sample(video: HTMLVideoElement, now: number): FrameSample | null {
     if (video.readyState < 2) return null;
     if (video.currentTime === this.lastVideoTime) return null;
     this.lastVideoTime = video.currentTime;
 
-    this.ctx.drawImage(video, 0, 0, PROCESSING_WIDTH, PROCESSING_HEIGHT);
+    drawVideoFrameCover(this.ctx, video, PROCESSING_WIDTH, PROCESSING_HEIGHT);
     const { data } = this.ctx.getImageData(
       0,
       0,
@@ -71,18 +87,25 @@ export class FrameAnalyzer {
           sumX += x;
           sumY += y;
           count++;
+          // Bail out early once it's clearly a whole-frame lighting shift
+          // rather than a disc — no point finishing the scan.
+          if (count > MAX_FOREGROUND_PIXELS) return null;
         }
       }
     }
 
     if (count < MIN_FOREGROUND_PIXELS) return null;
 
+    const width = maxX - minX + 1;
+    const height = maxY - minY + 1;
+    if (width > MAX_BOX_WIDTH && height > MAX_BOX_HEIGHT) return null;
+
     return {
       t: now,
       cx: sumX / count,
       cy: sumY / count,
-      width: maxX - minX + 1,
-      height: maxY - minY + 1,
+      width,
+      height,
       pixelCount: count,
     };
   }

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useCamera } from "../camera/useCamera";
 import { PROCESSING_HEIGHT, PROCESSING_WIDTH } from "../detection/constants";
+import { drawVideoFrameCover } from "../detection/drawVideoFrame";
 import { saveCalibration } from "../speed/calibration";
 import { loadDiscDiameterMm } from "../speed/settings";
 
@@ -43,7 +44,10 @@ export function CalibrationScreen({ onDone }: { onDone: () => void }) {
     if (!video || !canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.drawImage(video, 0, 0, PROCESSING_WIDTH, PROCESSING_HEIGHT);
+    // Same "cover" mapping the live preview uses (and that live scanning
+    // measures against) — otherwise what you see while framing the disc
+    // wouldn't match what actually gets measured here.
+    drawVideoFrameCover(ctx, video, PROCESSING_WIDTH, PROCESSING_HEIGHT);
     setCaptured(true);
     setBox(null);
     setSaved(false);

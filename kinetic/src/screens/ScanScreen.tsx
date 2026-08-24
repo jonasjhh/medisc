@@ -43,7 +43,7 @@ export function ScanScreen({ onOpenSettings }: { onOpenSettings: () => void }) {
     });
   }, []);
 
-  const { phase } = useScanner({
+  const { phase, debug } = useScanner({
     videoRef,
     active: scanning,
     onEvent: handleEvent,
@@ -83,6 +83,12 @@ export function ScanScreen({ onOpenSettings }: { onOpenSettings: () => void }) {
           ? PHASE_LABEL[phase]
           : "Ready — place the phone camera-up and press Start."}
       </p>
+
+      {scanning && (
+        <p style={styles.debug}>
+          motion: {debug.frameSeen ? `${debug.pixelCount}px` : "…"}
+        </p>
+      )}
 
       <button
         style={{
@@ -149,6 +155,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   video: { width: "100%", height: "100%", objectFit: "cover" },
   status: { textAlign: "center", color: "#9fb3ac", margin: "0.75rem 0" },
+  debug: {
+    textAlign: "center",
+    color: "#5c7269",
+    fontSize: "0.75rem",
+    fontFamily: "monospace",
+    margin: "-0.5rem 0 0.75rem",
+  },
   primaryButton: {
     width: "100%",
     padding: "0.9rem",

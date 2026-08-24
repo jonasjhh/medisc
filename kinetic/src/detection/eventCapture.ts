@@ -4,7 +4,7 @@ import type { FrameSample, PassEvent } from "./types";
 // disc filling more of the frame as it crosses overhead should trigger
 // reliably, while small incidental motion (hand withdrawing, wind in
 // grass) shouldn't arm a capture.
-const TRIGGER_MIN_PIXELS = 60;
+const TRIGGER_MIN_PIXELS = 90;
 const MAX_MISSED_FRAMES = 2; // tolerate brief gaps mid-event
 const MAX_EVENT_DURATION_MS = 700; // a disc crossing overhead is fast
 const MIN_EVENT_FRAMES = 3; // need at least this many samples for a speed
