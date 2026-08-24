@@ -7,15 +7,7 @@ import eslintConfigPrettier from "eslint-config-prettier";
 
 export default tseslint.config(
   {
-    ignores: [
-      "dist",
-      "coverage",
-      "playwright-report",
-      "test-results",
-      "dev-dist",
-      ".wrangler",
-      "kinetic",
-    ],
+    ignores: ["dist", ".wrangler"],
   },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
@@ -34,12 +26,6 @@ export default tseslint.config(
         "warn",
         { allowConstantExport: true },
       ],
-    },
-  },
-  {
-    files: ["e2e/**/*.ts", "playwright.config.ts"],
-    languageOptions: {
-      globals: globals.node,
     },
   },
   {

@@ -1,24 +1,15 @@
-name: Deploy Worker (Cloudflare)
+name: Deploy Kinetic (Cloudflare)
 
 on:
   push:
     branches: [main]
     paths:
-      - "src/**"
-      - "worker/**"
-      - "shared/**"
-      - "migrations/**"
-      - "index.html"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "vite.config.ts"
-      - "tsconfig*.json"
-      - "wrangler.toml"
-      - ".github/workflows/deploy-worker.yml"
+      - "kinetic/**"
+      - ".github/workflows/deploy-kinetic.yml"
   workflow_dispatch:
 
 concurrency:
-  group: cloudflare-deploy
+  group: cloudflare-deploy-kinetic
   cancel-in-progress: false
 
 jobs:
@@ -28,25 +19,27 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: kinetic/package.json
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
+          cache-dependency-path: kinetic/pnpm-lock.yaml
 
       - name: Install dependencies
+        working-directory: kinetic
         run: pnpm install --frozen-lockfile
 
       - name: Build frontend
+        working-directory: kinetic
         run: pnpm build
 
-      # Applies any migrations in migrations/ that D1 hasn't seen yet (it
-      # tracks applied migrations itself, so re-running this is a no-op
-      # once everything is up to date), then deploys the Worker.
-      - name: Apply D1 migrations and deploy
+      - name: Deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: kinetic
           command: deploy
-          preCommands: wrangler d1 migrations apply DB --remote
