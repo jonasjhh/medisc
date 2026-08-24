@@ -14,12 +14,13 @@ interface Position3D {
   z: number;
 }
 
-// Pinhole camera model: a disc's known real diameter plus its apparent
-// width in pixels gives its distance from the camera at that instant
-// (z = realDiameter * focalLength / apparentWidth); that distance plus the
-// pixel offset from the image center then gives its real x/y position.
-// Doing this per frame turns a sequence of 2D pixel measurements into a
-// sequence of 3D positions we can measure real-world speed from.
+// Pinhole camera model: the disc's ellipse-fitted major axis (see
+// frameAnalyzer.ts) plus its known real diameter gives its distance from
+// the camera at that instant (z = realDiameter * focalLength /
+// apparentMajorAxis); that distance plus the pixel offset from the image
+// center then gives its real x/y position. The major axis is used rather
+// than a bounding-box width because it stays equal to the disc's true
+// diameter regardless of tilt/bank, where a bounding box foreshortens.
 function toPositions(
   frames: FrameSample[],
   focalLengthPx: number,
@@ -28,9 +29,9 @@ function toPositions(
   const cx = PROCESSING_WIDTH / 2;
   const cy = PROCESSING_HEIGHT / 2;
   return frames
-    .filter((f) => f.width > 0)
+    .filter((f) => f.majorAxisPx > 0)
     .map((f) => {
-      const z = (discDiameterM * focalLengthPx) / f.width;
+      const z = (discDiameterM * focalLengthPx) / f.majorAxisPx;
       return {
         t: f.t,
         x: ((f.cx - cx) * z) / focalLengthPx,
@@ -40,10 +41,30 @@ function toPositions(
     });
 }
 
-// Speed is measured from the straight-line 3D displacement between the
-// first and last frame of the event, divided by elapsed time — a simple,
-// noise-tolerant average rather than differentiating every consecutive
-// frame pair (which would amplify pixel-measurement jitter).
+// Ordinary least-squares slope of v against t — the velocity component
+// implied by every sample at once, rather than just two of them.
+function regressionSlope(t: number[], v: number[]): number {
+  const n = t.length;
+  let sumT = 0;
+  let sumV = 0;
+  let sumTT = 0;
+  let sumTV = 0;
+  for (let i = 0; i < n; i++) {
+    sumT += t[i];
+    sumV += v[i];
+    sumTT += t[i] * t[i];
+    sumTV += t[i] * v[i];
+  }
+  const denominator = n * sumTT - sumT * sumT;
+  return denominator === 0 ? 0 : (n * sumTV - sumT * sumV) / denominator;
+}
+
+// Fits a straight-line velocity to the whole event — independently for
+// x(t), y(t), z(t) — instead of dividing the first/last frame's
+// displacement by elapsed time. Using only the endpoints makes the result
+// highly sensitive to noise in exactly the two frames least likely to be
+// clean (right at the edges of detection, where the blob is smallest and
+// partially formed); a regression across every sample averages that out.
 export function computeSpeed(
   event: PassEvent,
   focalLengthPx: number,
@@ -52,19 +73,24 @@ export function computeSpeed(
   const positions = toPositions(event.frames, focalLengthPx, discDiameterM);
   if (positions.length < 2) return null;
 
-  const first = positions[0];
-  const last = positions[positions.length - 1];
-  const durationMs = last.t - first.t;
-  if (durationMs <= 0) return null;
-
-  const dx = last.x - first.x;
-  const dy = last.y - first.y;
-  const dz = last.z - first.z;
-  const distanceM = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  const t0 = positions[0].t;
+  const tSeconds = positions.map((p) => (p.t - t0) / 1000);
+  const vx = regressionSlope(
+    tSeconds,
+    positions.map((p) => p.x),
+  );
+  const vy = regressionSlope(
+    tSeconds,
+    positions.map((p) => p.y),
+  );
+  const vz = regressionSlope(
+    tSeconds,
+    positions.map((p) => p.z),
+  );
 
   return {
-    speedMps: distanceM / (durationMs / 1000),
+    speedMps: Math.sqrt(vx * vx + vy * vy + vz * vz),
     frameCount: positions.length,
-    durationMs,
+    durationMs: positions[positions.length - 1].t - positions[0].t,
   };
 }

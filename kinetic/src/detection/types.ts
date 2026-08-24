@@ -1,12 +1,14 @@
 // One frame's motion measurement, in processing-canvas pixel coordinates
-// (see constants.ts).
+// (see constants.ts) — describing the single largest connected blob of
+// motion that frame, not the union of everything that moved.
 export interface FrameSample {
   t: number; // performance.now() at capture, ms
-  cx: number; // motion centroid x
-  cy: number; // motion centroid y
-  width: number; // bounding-box width of the moving region
-  height: number; // bounding-box height of the moving region
-  pixelCount: number; // how many pixels changed — a rough motion "mass"
+  cx: number; // blob centroid x
+  cy: number; // blob centroid y
+  width: number; // axis-aligned bounding-box width of the blob
+  height: number; // axis-aligned bounding-box height of the blob
+  pixelCount: number; // how many pixels make up the blob — its "mass"
+  majorAxisPx: number; // ellipse-fitted major axis — tilt-invariant diameter estimate
 }
 
 export interface PassEvent {
