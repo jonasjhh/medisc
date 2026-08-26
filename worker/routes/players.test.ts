@@ -1018,24 +1018,22 @@ describe("hole breakdown", () => {
       doubleBogey: 0,
       worse: 0,
     });
-    // The field is everyone by default: Alice's birdie + par, Bob's bogey,
-    // plus the par Bob's second round locked in on completion for the hole
-    // he never touched (see migration 0022's backfill and the /complete
-    // handler that marks remaining holes recorded).
+    // The field is everyone by default: Alice's birdie + par, Bob's bogey.
+    // Bob never touched hole 1 in his second round, and finishing no
+    // longer locks in a default for untouched holes, so it stays excluded.
     expect(breakdown.fieldDistribution).toEqual({
       ace: 0,
       albatross: 0,
       eagle: 0,
       birdie: 1,
-      par: 2,
+      par: 1,
       bogey: 1,
       doubleBogey: 0,
       worse: 0,
     });
     expect(breakdown.throws.map((t) => t.strokes).sort()).toEqual([2, 3]);
     expect(breakdown.playerAvgStrokes).toBe(2.5); // (2 + 3) / 2
-    // Field average: Alice's 2 + 3, Bob's 4, and Bob's locked-in default
-    // par (3) from his second round, across 4 throws = 3.
+    // Field average: Alice's 2 + 3, plus Bob's 4, across 3 throws = 3.
     expect(breakdown.fieldAvgStrokes).toBe(3);
   });
 
@@ -1177,9 +1175,9 @@ describe("hole breakdown", () => {
   });
 
   it("excludes a score still marked unrecorded on an already-completed round", async () => {
-    // Mirrors a legacy round completed before finishing locked in every
-    // hole (see migration 0022) — a stale recorded = 0 row should still be
-    // excluded even though its round is completed and counting.
+    // Finishing a round no longer locks in par for holes nobody touched —
+    // Bob never entered hole 1, so his row stays recorded = 0 even after
+    // the round is completed and counting.
     const { courseId, layoutId } = await seedCourse(env, {
       courseName: "Maple Hill",
       layoutName: "Blue",
@@ -1195,12 +1193,6 @@ describe("hole breakdown", () => {
       { [alice.id]: { 1: 3 } },
     );
     const holeId = round.holes[0].id;
-
-    await env.DB.prepare(
-      "UPDATE hole_scores SET recorded = 0 WHERE round_id = ? AND player_id = ?",
-    )
-      .bind(round.id, bob.id)
-      .run();
 
     const { breakdown } = await json(
       await request(`/api/players/${bob.id}/holes/${holeId}/breakdown`),

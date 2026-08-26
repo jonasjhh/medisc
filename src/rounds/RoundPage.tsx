@@ -138,6 +138,7 @@ export function RoundPage() {
           isCompleted={isCompleted}
           setScore={data.setScore}
           adjust={data.adjust}
+          unsetScore={data.unsetScore}
           isFirstStep={isFirstStep}
           isLastStep={isLastStep}
           onPrevious={goToPrevious}

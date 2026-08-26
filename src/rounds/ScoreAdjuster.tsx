@@ -53,6 +53,7 @@ export function ScoreAdjuster({
   min,
   onDecrement,
   onIncrement,
+  onUnset,
   readOnly = false,
   outcome,
   recorded = true,
@@ -63,6 +64,10 @@ export function ScoreAdjuster({
   min: number;
   onDecrement: () => void;
   onIncrement: () => void;
+  // At the floor, pressing minus again reverts the whole score to
+  // untouched instead of doing nothing — omit to keep the plain
+  // disabled-at-floor behavior (e.g. penalties).
+  onUnset?: () => void;
   readOnly?: boolean;
   outcome?: ScoreOutcome;
   recorded?: boolean;
@@ -75,6 +80,7 @@ export function ScoreAdjuster({
     outcome && outcome !== "par"
       ? adjusterTextColors[outcome][mode]
       : undefined;
+  const atFloor = value <= min;
 
   return (
     <Box textAlign="center">
@@ -89,9 +95,13 @@ export function ScoreAdjuster({
       >
         {!readOnly && (
           <IconButton
-            aria-label={`decrease ${label.toLowerCase()}`}
-            onClick={onDecrement}
-            disabled={value <= min}
+            aria-label={
+              atFloor && onUnset
+                ? `unset ${label.toLowerCase()}`
+                : `decrease ${label.toLowerCase()}`
+            }
+            onClick={atFloor && onUnset ? onUnset : onDecrement}
+            disabled={atFloor && !onUnset}
             sx={
               compact ? compactAdjusterButtonSx(theme) : adjusterButtonSx(theme)
             }

@@ -198,7 +198,7 @@ describe("RoundPage", () => {
     expect(roundsApi.getRound).toHaveBeenCalledTimes(2);
   });
 
-  it("does not let strokes go below 1", async () => {
+  it("unsets the score when pressing minus at 1 stroke", async () => {
     const roundAtMin: roundsApi.RoundDetail = {
       ...baseRound,
       scores: [
@@ -214,12 +214,26 @@ describe("RoundPage", () => {
       ],
     };
     vi.mocked(roundsApi.getRound).mockResolvedValue(roundAtMin);
+    vi.mocked(roundsApi.unsetHoleScore).mockResolvedValue({
+      id: 1000,
+      roundId: 1,
+      holeId: 100,
+      playerId: 1,
+      strokes: 3,
+      penalties: 0,
+      recorded: false,
+    });
+    const user = userEvent.setup();
     renderPage();
 
     await screen.findByText("Hole 1");
-    expect(
-      screen.getByRole("button", { name: /decrease strokes/i }),
-    ).toBeDisabled();
+    const unsetButton = screen.getByRole("button", { name: /unset strokes/i });
+    expect(unsetButton).toBeEnabled();
+
+    await user.click(unsetButton);
+
+    expect(roundsApi.unsetHoleScore).toHaveBeenCalledWith(1000);
+    expect(await screen.findAllByText("-")).not.toHaveLength(0);
   });
 
   it("finishes the round and shows a Completed badge instead of adjusters", async () => {

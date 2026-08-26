@@ -71,3 +71,49 @@ holeScoresRoute.patch("/:id", async (c) => {
     }),
   );
 });
+
+// Reverts a hole score back to its untouched, seeded state (strokes = par,
+// penalties = 0, recorded = false) — the mirror image of what inserting a
+// fresh score does (see parScoreInsertStatements in rounds.ts).
+holeScoresRoute.post("/:id/unset", async (c) => {
+  const id = parseIntParam(c.req.param("id"));
+  if (id === null) {
+    return c.json({ error: "Invalid hole score id" }, 400);
+  }
+
+  const existing = await c.env.DB.prepare(
+    `SELECT holes.par, rounds.completed_at
+     FROM hole_scores
+     JOIN holes ON holes.id = hole_scores.hole_id
+     JOIN rounds ON rounds.id = hole_scores.round_id
+     WHERE hole_scores.id = ?`,
+  )
+    .bind(id)
+    .first<{ par: number; completed_at: string | null }>();
+  if (!existing) {
+    return c.json({ error: "Hole score not found" }, 404);
+  }
+  if (existing.completed_at) {
+    return c.json({ error: "Cannot edit a completed round" }, 409);
+  }
+
+  const row = await c.env.DB.prepare(
+    `UPDATE hole_scores SET strokes = ?, penalties = 0, recorded = 0
+     WHERE id = ?
+     RETURNING id, round_id, hole_id, player_id, strokes, penalties, recorded`,
+  )
+    .bind(existing.par, id)
+    .first<HoleScoreRow>();
+
+  return c.json(
+    holeScoreResponseSchema.parse({
+      id: row!.id,
+      roundId: row!.round_id,
+      holeId: row!.hole_id,
+      playerId: row!.player_id,
+      strokes: row!.strokes,
+      penalties: row!.penalties,
+      recorded: Boolean(row!.recorded),
+    }),
+  );
+});

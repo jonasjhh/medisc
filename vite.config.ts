@@ -74,6 +74,6 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       exclude: ["e2e/**", "**/*.config.*", "src/main.tsx"],
     },
-    exclude: ["e2e/**", "worker/**", "node_modules/**"],
+    exclude: ["e2e/**", "worker/**", "node_modules/**", "kinetic/**"],
   },
 });

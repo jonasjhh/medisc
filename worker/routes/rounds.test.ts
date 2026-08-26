@@ -344,7 +344,7 @@ describe("rounds API", () => {
     expect(res.status).toBe(404);
   });
 
-  it("marks every still-unrecorded score as recorded when finishing", async () => {
+  it("leaves still-unrecorded scores unrecorded when finishing", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
     const created = await json(
@@ -363,7 +363,7 @@ describe("rounds API", () => {
       }),
       roundDetailSchema,
     );
-    expect(completed.scores.every((s) => s.recorded)).toBe(true);
+    expect(completed.scores.every((s) => !s.recorded)).toBe(true);
   });
 
   it("reopens a completed round and allows editing scores again", async () => {

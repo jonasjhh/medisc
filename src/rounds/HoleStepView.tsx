@@ -24,6 +24,7 @@ export function HoleStepView({
   isCompleted,
   setScore,
   adjust,
+  unsetScore,
   isFirstStep,
   isLastStep,
   onPrevious,
@@ -36,6 +37,7 @@ export function HoleStepView({
   isCompleted: boolean;
   setScore: (scoreId: number, field: Field, nextValue: number) => Promise<void>;
   adjust: (scoreId: number, field: Field, delta: number) => void;
+  unsetScore: (scoreId: number) => Promise<void>;
   isFirstStep: boolean;
   isLastStep: boolean;
   onPrevious: () => void;
@@ -112,6 +114,7 @@ export function HoleStepView({
                 recorded={score.recorded}
                 onDecrement={() => void adjust(score.id, "strokes", -1)}
                 onIncrement={() => void adjust(score.id, "strokes", 1)}
+                onUnset={() => void unsetScore(score.id)}
               />
               <ScoreAdjuster
                 label="Penalties"

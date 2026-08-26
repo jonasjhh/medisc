@@ -110,7 +110,7 @@ export function RoundHeader({
         <DialogContent>
           <DialogContentText>
             {unrecordedCount} hole{unrecordedCount === 1 ? "" : "s"} haven't
-            been scored yet — finishing will lock in par for those holes.
+            been scored yet — they'll stay unregistered after you finish.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

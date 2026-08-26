@@ -75,6 +75,14 @@ export async function updateHoleScore(
   );
 }
 
+export async function unsetHoleScore(
+  holeScoreId: number,
+): Promise<HoleScoreResponse> {
+  return holeScoreResponseSchema.parse(
+    await postJson(`/api/hole-scores/${holeScoreId}/unset`, {}),
+  );
+}
+
 export async function completeRound(roundId: number): Promise<RoundDetail> {
   return roundDetailSchema.parse(
     await postJson(`/api/rounds/${roundId}/complete`, {}),

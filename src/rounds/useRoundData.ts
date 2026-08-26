@@ -3,6 +3,7 @@ import {
   completeRound,
   getRound,
   reopenRound,
+  unsetHoleScore,
   updateHoleScore,
   updateRound,
 } from "./api";
@@ -80,6 +81,39 @@ export function useRoundData(id: number) {
     return setScore(scoreId, field, Math.max(floor, current[field] + delta));
   };
 
+  // Reverts a hole score back to untouched (strokes reset to the hole's
+  // par, penalties to 0, recorded cleared) — triggered by pressing minus
+  // at the 1-stroke floor, undoing a mis-tap rather than getting stuck.
+  const unsetScore = async (scoreId: number) => {
+    if (!round) {
+      return;
+    }
+    const current = round.scores.find((score) => score.id === scoreId);
+    if (!current) {
+      return;
+    }
+    const hole = round.holes.find((h) => h.id === current.holeId);
+    if (!hole) {
+      return;
+    }
+
+    setRound({
+      ...round,
+      scores: round.scores.map((score) =>
+        score.id === scoreId
+          ? { ...score, strokes: hole.par, penalties: 0, recorded: false }
+          : score,
+      ),
+    });
+
+    try {
+      await unsetHoleScore(scoreId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reset score");
+      await refresh();
+    }
+  };
+
   const handleFinish = async () => {
     setFinishing(true);
     setError(null);
@@ -133,6 +167,7 @@ export function useRoundData(id: number) {
     togglingCounting,
     setScore,
     adjust,
+    unsetScore,
     handleFinish,
     handleReopen,
     handleToggleCounting,

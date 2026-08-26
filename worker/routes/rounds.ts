@@ -489,16 +489,9 @@ roundsRoute.post("/:roundId/complete", async (c) => {
     .bind(roundId)
     .run();
 
-  // Finishing locks in every hole's current value (explicit or still at
-  // its seeded default) as the player's registered score, so a completed
-  // round's totals are always complete rather than silently excluding
-  // holes nobody ever tapped.
-  await c.env.DB.prepare(
-    "UPDATE hole_scores SET recorded = 1 WHERE round_id = ? AND recorded = 0",
-  )
-    .bind(roundId)
-    .run();
-
+  // Holes nobody ever touched stay unrecorded even after finishing — a
+  // completed round's totals only ever reflect scores someone actually
+  // entered, never a silently-assumed par.
   const detail = await buildRoundDetail(c.env.DB, roundId);
   return c.json(detail);
 });
