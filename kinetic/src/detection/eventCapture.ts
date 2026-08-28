@@ -14,7 +14,13 @@ const MAX_MISSED_FRAMES = 2; // tolerate brief gaps mid-event
 const MAX_EVENT_DURATION_MS = 1500;
 
 const MIN_EVENT_FRAMES = 3; // need at least this many samples for a speed
-const COOLDOWN_MS = 600; // avoid re-triggering on the same motion trailing off
+// Debounces the trailing motion of the throw that just finished (follow-
+// through, disturbed grass, camera micro-shake) so it can't immediately
+// re-trigger a bogus second event — that noise settles in well under
+// 150ms. This is not meant to space out separate throws (those are
+// seconds apart in practice), so it's kept short to avoid dropping a
+// fast second throw.
+const COOLDOWN_MS = 150;
 
 // Frames seen below the trigger threshold, while still armed, are the
 // disc's real entry — it starts small/far and only grows past

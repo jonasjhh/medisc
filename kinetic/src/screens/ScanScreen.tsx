@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useCamera } from "../camera/useCamera";
 import { PROCESSING_HEIGHT, PROCESSING_WIDTH } from "../detection/constants";
 import type { PassEvent } from "../detection/types";
@@ -9,6 +9,7 @@ import { loadDiscDiameterMm } from "../speed/settings";
 import { mpsToKph, mpsToMph } from "../speed/units";
 
 interface ScanResult {
+  id: string;
   mph: number;
   kph: number;
   frameCount: number;
@@ -23,7 +24,7 @@ const PHASE_LABEL: Record<string, string> = {
 export function ScanScreen({ onOpenSettings }: { onOpenSettings: () => void }) {
   const { videoRef, status, error } = useCamera();
   const [scanning, setScanning] = useState(false);
-  const [result, setResult] = useState<ScanResult | null>(null);
+  const [results, setResults] = useState<ScanResult[]>([]);
   const calibration = loadCalibration();
 
   const handleEvent = useCallback((event: PassEvent) => {
@@ -36,11 +37,15 @@ export function ScanScreen({ onOpenSettings }: { onOpenSettings: () => void }) {
       discDiameterM,
     );
     if (!speed) return;
-    setResult({
-      mph: mpsToMph(speed.speedMps),
-      kph: mpsToKph(speed.speedMps),
-      frameCount: speed.frameCount,
-    });
+    setResults((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        mph: mpsToMph(speed.speedMps),
+        kph: mpsToKph(speed.speedMps),
+        frameCount: speed.frameCount,
+      },
+    ]);
   }, []);
 
   const { phase, debug } = useScanner({
@@ -50,9 +55,38 @@ export function ScanScreen({ onOpenSettings }: { onOpenSettings: () => void }) {
   });
 
   const toggleScan = () => {
-    setResult(null);
-    setScanning((s) => !s);
+    setScanning((s) => {
+      const next = !s;
+      // Starting a fresh session clears prior throws; stopping must leave
+      // the list intact so it can actually be read once the phone is
+      // picked back up.
+      if (next) setResults([]);
+      return next;
+    });
   };
+
+  // The phone sits face-down and untouched through an entire multi-throw
+  // session — without a wake lock, the screen can time out and pause
+  // processing partway through, silently breaking the session.
+  useEffect(() => {
+    if (!scanning || !("wakeLock" in navigator)) return;
+    let sentinel: WakeLockSentinel | null = null;
+    let cancelled = false;
+    navigator.wakeLock
+      .request("screen")
+      .then((s) => {
+        if (cancelled) {
+          void s.release();
+          return;
+        }
+        sentinel = s;
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      void sentinel?.release();
+    };
+  }, [scanning]);
 
   return (
     <main style={styles.main}>
@@ -101,12 +135,20 @@ export function ScanScreen({ onOpenSettings }: { onOpenSettings: () => void }) {
         {scanning ? "Stop scan" : "Start scan"}
       </button>
 
-      {result && (
-        <div style={styles.resultCard}>
-          <div style={styles.resultSpeed}>{result.kph.toFixed(1)} km/h</div>
-          <div style={styles.resultSub}>
-            {result.mph.toFixed(1)} mph · {result.frameCount} frames
-          </div>
+      {results.length > 0 && (
+        <div style={styles.resultsList}>
+          <h2 style={styles.resultsHeading}>
+            {results.length} throw{results.length === 1 ? "" : "s"} recorded
+          </h2>
+          {results.map((r, i) => (
+            <div key={r.id} style={styles.resultRow}>
+              <span style={styles.resultIndex}>#{i + 1}</span>
+              <span style={styles.resultSpeedRow}>{r.kph.toFixed(1)} km/h</span>
+              <span style={styles.resultSubRow}>
+                {r.mph.toFixed(1)} mph · {r.frameCount} frames
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </main>
@@ -171,13 +213,29 @@ const styles: Record<string, React.CSSProperties> = {
     border: "none",
     color: "#0e1e2a",
   },
-  resultCard: {
+  resultsList: {
     marginTop: "1.25rem",
-    padding: "1.25rem",
+    padding: "0.75rem 1rem",
     borderRadius: 12,
     background: "#12261f",
+    maxHeight: "18rem",
+    overflowY: "auto",
+  },
+  resultsHeading: {
+    margin: "0.25rem 0 0.75rem",
+    fontSize: "0.95rem",
+    fontWeight: 600,
+    color: "#9fb3ac",
     textAlign: "center",
   },
-  resultSpeed: { fontSize: "2.5rem", fontWeight: 700, color: "#38e0c4" },
-  resultSub: { color: "#9fb3ac", marginTop: "0.25rem" },
+  resultRow: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "0.6rem",
+    padding: "0.5rem 0",
+    borderTop: "1px solid #1e3a33",
+  },
+  resultIndex: { color: "#5c7269", fontSize: "0.85rem", minWidth: "1.75rem" },
+  resultSpeedRow: { fontSize: "1.3rem", fontWeight: 700, color: "#38e0c4" },
+  resultSubRow: { color: "#9fb3ac", fontSize: "0.85rem" },
 };
