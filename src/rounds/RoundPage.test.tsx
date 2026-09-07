@@ -1,4 +1,5 @@
 import {
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -17,7 +18,7 @@ vi.mock("./api");
 
 const baseRound: roundsApi.RoundDetail = {
   id: 1,
-  createdAt: "",
+  createdAt: "2026-01-10 12:00:00",
   completedAt: null,
   counting: true,
   course: { id: 1, name: "Maple Hill" },
@@ -50,7 +51,7 @@ const baseRound: roundsApi.RoundDetail = {
 
 const twelveHoleRound: roundsApi.RoundDetail = {
   id: 2,
-  createdAt: "",
+  createdAt: "2026-01-10 12:00:00",
   completedAt: null,
   counting: true,
   course: { id: 2, name: "Stjørdal" },
@@ -304,6 +305,98 @@ describe("RoundPage", () => {
     await screen.findByText("Completed");
     expect(
       screen.getByRole("checkbox", { name: /counting round/i }),
+    ).toBeDisabled();
+  });
+
+  it("shows the round's date and weather", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue({
+      ...baseRound,
+      weather: {
+        temperatureCelsius: 12.3,
+        windSpeedMs: 3.4,
+        windDirectionDegrees: 90,
+        symbolCode: "cloudy",
+      },
+    });
+    renderPage();
+
+    expect(await screen.findByText("10 Jan 2026 12:00")).toBeInTheDocument();
+    expect(await screen.findByText("12°C")).toBeInTheDocument();
+    expect(screen.getByText("3.4 m/s")).toBeInTheDocument();
+  });
+
+  it("edits the round's date/time and weather", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue({
+      ...baseRound,
+      weather: {
+        temperatureCelsius: 12,
+        windSpeedMs: 3,
+        windDirectionDegrees: 90,
+        symbolCode: "cloudy",
+      },
+    });
+    vi.mocked(roundsApi.updateRound).mockResolvedValue({
+      ...baseRound,
+      createdAt: "2026-02-01 09:15:00",
+      weather: {
+        temperatureCelsius: -2,
+        windSpeedMs: 5,
+        windDirectionDegrees: 270,
+        symbolCode: "snow",
+      },
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(
+      screen.getByRole("button", { name: /edit round details/i }),
+    );
+
+    const dateInput = await screen.findByLabelText(/date & time/i);
+    expect(dateInput).toHaveValue("2026-01-10T12:00");
+    expect(screen.getByLabelText(/temperature/i)).toHaveValue(12);
+
+    fireEvent.change(dateInput, { target: { value: "2026-02-01T09:15" } });
+    fireEvent.change(screen.getByLabelText(/temperature/i), {
+      target: { value: "-2" },
+    });
+    fireEvent.change(screen.getByLabelText(/wind speed/i), {
+      target: { value: "5" },
+    });
+    fireEvent.change(screen.getByLabelText(/wind direction/i), {
+      target: { value: "270" },
+    });
+
+    await user.click(screen.getByRole("combobox", { name: /condition/i }));
+    await user.click(await screen.findByRole("option", { name: /^snow$/i }));
+
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(roundsApi.updateRound).toHaveBeenCalledWith(1, {
+      createdAt: "2026-02-01 09:15:00",
+      weather: {
+        temperatureCelsius: -2,
+        windSpeedMs: 5,
+        windDirectionDegrees: 270,
+        symbolCode: "snow",
+      },
+    });
+    await waitForElementToBeRemoved(() =>
+      screen.queryByRole("button", { name: /^save$/i }),
+    );
+  });
+
+  it("disables editing round details on a completed round", async () => {
+    vi.mocked(roundsApi.getRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+    });
+    renderPage();
+
+    await screen.findByText("Completed");
+    expect(
+      screen.getByRole("button", { name: /edit round details/i }),
     ).toBeDisabled();
   });
 

@@ -399,7 +399,7 @@ roundsRoute.patch("/:roundId", async (c) => {
     return c.json({ error: "Round not found" }, 404);
   }
 
-  const { playerIds, counting } = parsed.data;
+  const { playerIds, counting, createdAt, weather } = parsed.data;
 
   if (playerIds !== undefined) {
     if (round.completed_at) {
@@ -463,6 +463,35 @@ roundsRoute.patch("/:roundId", async (c) => {
     }
     await c.env.DB.prepare("UPDATE rounds SET counting = ? WHERE id = ?")
       .bind(counting ? 1 : 0, roundId)
+      .run();
+  }
+
+  if (createdAt !== undefined) {
+    if (round.completed_at) {
+      return c.json({ error: "Cannot edit a completed round" }, 409);
+    }
+    await c.env.DB.prepare("UPDATE rounds SET created_at = ? WHERE id = ?")
+      .bind(createdAt, roundId)
+      .run();
+  }
+
+  if (weather !== undefined) {
+    if (round.completed_at) {
+      return c.json({ error: "Cannot edit a completed round" }, 409);
+    }
+    await c.env.DB.prepare(
+      `UPDATE rounds
+       SET temperature_celsius = ?, wind_speed_ms = ?,
+           wind_direction_degrees = ?, weather_symbol_code = ?
+       WHERE id = ?`,
+    )
+      .bind(
+        weather.temperatureCelsius,
+        weather.windSpeedMs,
+        weather.windDirectionDegrees,
+        weather.symbolCode,
+        roundId,
+      )
       .run();
   }
 

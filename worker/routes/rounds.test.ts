@@ -617,6 +617,147 @@ describe("rounds API", () => {
     expect(updated.counting).toBe(false);
   });
 
+  it("edits the created-at timestamp of an in-progress round", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const round = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+      roundDetailSchema,
+    );
+
+    const res = await request(`/api/rounds/${round.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ createdAt: "2026-01-15 09:30:00" }),
+    });
+    expect(res.status).toBe(200);
+    const updated = await json(res, roundDetailSchema);
+    expect(updated.createdAt).toBe("2026-01-15 09:30:00");
+
+    const refetched = await json(
+      await request(`/api/rounds/${round.id}`),
+      roundDetailSchema,
+    );
+    expect(refetched.createdAt).toBe("2026-01-15 09:30:00");
+  });
+
+  it("rejects a malformed created-at timestamp", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const round = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+      roundDetailSchema,
+    );
+
+    const res = await request(`/api/rounds/${round.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ createdAt: "not-a-timestamp" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("edits all four weather fields of an in-progress round", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const round = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+      roundDetailSchema,
+    );
+
+    const res = await request(`/api/rounds/${round.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        weather: {
+          temperatureCelsius: 12.5,
+          windSpeedMs: 3.2,
+          windDirectionDegrees: 90,
+          symbolCode: "cloudy",
+        },
+      }),
+    });
+    expect(res.status).toBe(200);
+    const updated = await json(res, roundDetailSchema);
+    expect(updated.weather).toEqual({
+      temperatureCelsius: 12.5,
+      windSpeedMs: 3.2,
+      windDirectionDegrees: 90,
+      symbolCode: "cloudy",
+    });
+  });
+
+  it("409s when editing created-at or weather on a completed round", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const round = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+      roundDetailSchema,
+    );
+    await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
+
+    const createdAtRes = await request(`/api/rounds/${round.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ createdAt: "2026-01-15 09:30:00" }),
+    });
+    expect(createdAtRes.status).toBe(409);
+
+    const weatherRes = await request(`/api/rounds/${round.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        weather: {
+          temperatureCelsius: 12.5,
+          windSpeedMs: 3.2,
+          windDirectionDegrees: 90,
+          symbolCode: "cloudy",
+        },
+      }),
+    });
+    expect(weatherRes.status).toBe(409);
+  });
+
+  it("edits created-at and weather again once a completed round is reopened", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const round = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+      roundDetailSchema,
+    );
+    await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
+    await request(`/api/rounds/${round.id}/reopen`, { method: "POST" });
+
+    const res = await request(`/api/rounds/${round.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ createdAt: "2026-01-15 09:30:00" }),
+    });
+    expect(res.status).toBe(200);
+    const updated = await json(res, roundDetailSchema);
+    expect(updated.createdAt).toBe("2026-01-15 09:30:00");
+  });
+
   it("404s when swapping players on a round that doesn't exist", async () => {
     const res = await request("/api/rounds/999", {
       method: "PATCH",

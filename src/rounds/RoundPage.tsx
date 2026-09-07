@@ -83,6 +83,7 @@ export function RoundPage() {
         reopening={data.reopening}
         onFinish={data.handleFinish}
         onReopen={data.handleReopen}
+        onRoundUpdated={data.setRound}
       />
 
       <CountingToggle

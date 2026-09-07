@@ -18,11 +18,27 @@ export const updateRoundSchema = z
   .object({
     playerIds: z.array(z.number().int().positive()).min(1).optional(),
     counting: z.boolean().optional(),
+    createdAt: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/, "Invalid timestamp")
+      .optional(),
+    weather: z
+      .object({
+        temperatureCelsius: z.number().min(-60).max(60),
+        windSpeedMs: z.number().min(0).max(100),
+        windDirectionDegrees: z.number().min(0).max(360),
+        symbolCode: z.string().nullable(),
+      })
+      .optional(),
   })
   .refine(
-    (data) => data.playerIds !== undefined || data.counting !== undefined,
+    (data) =>
+      data.playerIds !== undefined ||
+      data.counting !== undefined ||
+      data.createdAt !== undefined ||
+      data.weather !== undefined,
     {
-      message: "playerIds or counting must be provided",
+      message: "playerIds, counting, createdAt, or weather must be provided",
     },
   );
 

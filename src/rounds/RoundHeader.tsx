@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
+import EditIcon from "@mui/icons-material/Edit";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Dialog from "@mui/material/Dialog";
@@ -7,10 +8,15 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
+import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import type { RoundDetail } from "./api";
+import { EditRoundDetailsDialog } from "./EditRoundDetailsDialog";
+import { RoundWeatherBadge } from "./RoundWeatherBadge";
 import { ShareRoundDialog } from "./ShareRoundDialog";
+import { formatDateTime } from "../shared/formatDateTime";
 
 export function RoundHeader({
   round,
@@ -19,6 +25,7 @@ export function RoundHeader({
   reopening,
   onFinish,
   onReopen,
+  onRoundUpdated,
 }: {
   round: RoundDetail;
   isCompleted: boolean;
@@ -26,9 +33,11 @@ export function RoundHeader({
   reopening: boolean;
   onFinish: () => Promise<void>;
   onReopen: () => Promise<void>;
+  onRoundUpdated: (round: RoundDetail) => void;
 }) {
   const [shareOpen, setShareOpen] = useState(false);
   const [finishWarningOpen, setFinishWarningOpen] = useState(false);
+  const [editDetailsOpen, setEditDetailsOpen] = useState(false);
   const unrecordedCount = round.scores.filter(
     (score) => !score.recorded,
   ).length;
@@ -93,6 +102,38 @@ export function RoundHeader({
           </Button>
         )}
       </Stack>
+
+      <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 1 }}>
+        <Typography variant="caption" color="text.secondary">
+          {formatDateTime(round.createdAt)}
+        </Typography>
+        {round.weather && <RoundWeatherBadge weather={round.weather} />}
+        <Tooltip
+          title={
+            isCompleted
+              ? "Reopen the round to edit its date or weather"
+              : "Edit date, time, or weather"
+          }
+        >
+          <span>
+            <IconButton
+              size="small"
+              aria-label="edit round details"
+              disabled={isCompleted}
+              onClick={() => setEditDetailsOpen(true)}
+            >
+              <EditIcon fontSize="inherit" />
+            </IconButton>
+          </span>
+        </Tooltip>
+      </Stack>
+
+      <EditRoundDetailsDialog
+        open={editDetailsOpen}
+        onClose={() => setEditDetailsOpen(false)}
+        round={round}
+        onRoundUpdated={onRoundUpdated}
+      />
 
       {isCompleted && (
         <ShareRoundDialog

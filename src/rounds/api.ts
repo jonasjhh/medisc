@@ -97,7 +97,12 @@ export async function reopenRound(roundId: number): Promise<RoundDetail> {
 
 export async function updateRound(
   roundId: number,
-  input: { playerIds?: number[]; counting?: boolean },
+  input: {
+    playerIds?: number[];
+    counting?: boolean;
+    createdAt?: string;
+    weather?: RoundWeather;
+  },
 ): Promise<RoundDetail> {
   return roundDetailSchema.parse(
     await patchJson(`/api/rounds/${roundId}`, input),
