@@ -32,6 +32,7 @@ function aRoundDetail(overrides: Partial<RoundDetail> = {}): RoundDetail {
     players: [],
     scores: [],
     weather: null,
+    personalBests: null,
     ...overrides,
   });
 }

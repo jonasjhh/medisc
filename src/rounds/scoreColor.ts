@@ -38,6 +38,15 @@ export function scoreOutcome(strokes: number, par: number): ScoreOutcome {
   return "worse";
 }
 
+// "+3" / "E" / "-2" — a total's score relative to par.
+export function relativeToPar(total: number, par: number): string {
+  const diff = total - par;
+  if (diff === 0) {
+    return "E";
+  }
+  return diff > 0 ? `+${diff}` : `${diff}`;
+}
+
 type Mode = "light" | "dark";
 type ColoredOutcome = Exclude<ScoreOutcome, "par">;
 

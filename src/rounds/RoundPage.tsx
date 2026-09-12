@@ -129,6 +129,7 @@ export function RoundPage() {
           scores={round.scores}
           holeGroups={holeGroups}
           scoreByKey={scoreByKey}
+          personalBests={round.personalBests}
         />
       ) : (
         <HoleStepView

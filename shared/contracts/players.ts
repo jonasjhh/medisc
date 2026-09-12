@@ -100,3 +100,20 @@ export const holeBreakdownResponseSchema = z.object({
   breakdown: holeBreakdownSchema,
 });
 export type HoleBreakdownResponse = z.infer<typeof holeBreakdownResponseSchema>;
+
+export const personalBestSchema = z.object({
+  courseId: z.number(),
+  courseName: z.string(),
+  layoutId: z.number(),
+  layoutName: z.string(),
+  roundId: z.number(),
+  achievedAt: z.string(),
+  totalStrokes: z.number(),
+  totalPar: z.number(),
+});
+export type PersonalBest = z.infer<typeof personalBestSchema>;
+
+export const personalBestsResponseSchema = z.object({
+  personalBests: z.array(personalBestSchema),
+});
+export type PersonalBestsResponse = z.infer<typeof personalBestsResponseSchema>;

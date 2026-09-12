@@ -55,6 +55,9 @@ describe("PlayerStatsPage", () => {
         worse: 0,
       },
     });
+    vi.mocked(playersApi.getPersonalBests).mockResolvedValue({
+      personalBests: [],
+    });
   });
 
   it("shows an empty state when the player has no completed rounds", async () => {
@@ -66,6 +69,40 @@ describe("PlayerStatsPage", () => {
     expect(
       await screen.findByText(/no completed rounds yet/i),
     ).toBeInTheDocument();
+  });
+
+  it("hides the personal bests section when there are none", async () => {
+    vi.mocked(playersApi.getPlayerLayouts).mockResolvedValue({ layouts: [] });
+
+    renderPage();
+
+    await screen.findByText("Alice");
+    expect(screen.queryByText("Personal bests")).not.toBeInTheDocument();
+  });
+
+  it("shows a personal best with a link to the round it was set in", async () => {
+    vi.mocked(playersApi.getPlayerLayouts).mockResolvedValue({ layouts: [] });
+    vi.mocked(playersApi.getPersonalBests).mockResolvedValue({
+      personalBests: [
+        {
+          courseId: 1,
+          courseName: "Maple Hill",
+          layoutId: 10,
+          layoutName: "Blue",
+          roundId: 42,
+          achievedAt: "2026-01-10 12:00:00",
+          totalStrokes: 54,
+          totalPar: 57,
+        },
+      ],
+    });
+
+    renderPage();
+
+    await screen.findByText("Personal bests");
+    expect(screen.getByText("Maple Hill — Blue")).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: /54 \(-3\)/ });
+    expect(link).toHaveAttribute("href", "/rounds/42");
   });
 
   it("hides the throw distribution section when no counting throws exist", async () => {

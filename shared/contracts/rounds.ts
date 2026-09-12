@@ -44,6 +44,17 @@ export const roundWeatherSchema = z.object({
 });
 export type RoundWeather = z.infer<typeof roundWeatherSchema>;
 
+// Only present (non-null) once the round is completed, and only lists
+// players whose round was fully recorded (every hole scored) — a player
+// who left holes unrecorded doesn't have an eligible total to compare.
+export const roundPersonalBestSchema = z.object({
+  playerId: z.number(),
+  totalStrokes: z.number(),
+  isNewBest: z.boolean(),
+  previousBestStrokes: z.number().nullable(),
+});
+export type RoundPersonalBest = z.infer<typeof roundPersonalBestSchema>;
+
 export const roundDetailSchema = z.object({
   id: z.number(),
   createdAt: z.string(),
@@ -55,6 +66,7 @@ export const roundDetailSchema = z.object({
   players: z.array(roundPlayerSchema),
   scores: z.array(roundScoreSchema),
   weather: roundWeatherSchema.nullable(),
+  personalBests: z.array(roundPersonalBestSchema).nullable(),
 });
 export type RoundDetail = z.infer<typeof roundDetailSchema>;
 

@@ -2,6 +2,7 @@ import { deleteRequest, patchJson, postJson, request } from "../api/client";
 import {
   holeBreakdownResponseSchema,
   holeStatsResponseSchema,
+  personalBestsResponseSchema,
   playedLayoutsResponseSchema,
   playerListResponseSchema,
   playerSchema,
@@ -14,6 +15,8 @@ import type {
   HoleStat,
   HoleStatsResponse,
   HoleThrow,
+  PersonalBest,
+  PersonalBestsResponse,
   PlayedLayout,
   PlayedLayoutsResponse,
   Player,
@@ -29,6 +32,8 @@ export type {
   HoleStat,
   HoleStatsResponse,
   HoleThrow,
+  PersonalBest,
+  PersonalBestsResponse,
   PlayedLayout,
   PlayedLayoutsResponse,
   Player,
@@ -101,6 +106,14 @@ export async function getScoreDistribution(
 ): Promise<ScoreDistributionResponse> {
   return scoreDistributionResponseSchema.parse(
     await request(`/api/players/${playerId}/score-distribution`),
+  );
+}
+
+export async function getPersonalBests(
+  playerId: number,
+): Promise<PersonalBestsResponse> {
+  return personalBestsResponseSchema.parse(
+    await request(`/api/players/${playerId}/personal-bests`),
   );
 }
 

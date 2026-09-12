@@ -1,23 +1,24 @@
+import Chip from "@mui/material/Chip";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import type { RoundHole, RoundPlayer, RoundScore } from "./api";
-
-function relativeToPar(total: number, par: number): string {
-  const diff = total - par;
-  if (diff === 0) {
-    return "E";
-  }
-  return diff > 0 ? `+${diff}` : `${diff}`;
-}
+import type {
+  RoundHole,
+  RoundPersonalBest,
+  RoundPlayer,
+  RoundScore,
+} from "./api";
+import { relativeToPar } from "./scoreColor";
 
 export function TotalsList({
   players,
   scores,
   holesInScope,
+  personalBests,
 }: {
   players: RoundPlayer[];
   scores: RoundScore[];
   holesInScope: RoundHole[];
+  personalBests?: RoundPersonalBest[] | null;
 }) {
   const parByHoleId = new Map(holesInScope.map((hole) => [hole.id, hole.par]));
   return (
@@ -40,10 +41,23 @@ export function TotalsList({
           (sum, score) => sum + (parByHoleId.get(score.holeId) ?? 0),
           0,
         );
+        const isNewBest = personalBests?.some(
+          (pb) => pb.playerId === player.id && pb.isNewBest,
+        );
         return (
-          <Typography key={player.id} fontWeight={600}>
-            {player.name}: {total} ({relativeToPar(total, par)})
-          </Typography>
+          <Stack
+            key={player.id}
+            direction="row"
+            spacing={1}
+            alignItems="center"
+          >
+            <Typography fontWeight={600}>
+              {player.name}: {total} ({relativeToPar(total, par)})
+            </Typography>
+            {isNewBest && (
+              <Chip label="New personal best!" color="success" size="small" />
+            )}
+          </Stack>
         );
       })}
     </Stack>

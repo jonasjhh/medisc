@@ -1,5 +1,10 @@
 import Stack from "@mui/material/Stack";
-import type { RoundHole, RoundPlayer, RoundScore } from "./api";
+import type {
+  RoundHole,
+  RoundPersonalBest,
+  RoundPlayer,
+  RoundScore,
+} from "./api";
 import { ScorecardGroupTable } from "./ScorecardGroupTable";
 import { TotalsList } from "./TotalsList";
 
@@ -8,11 +13,13 @@ export function FinalStepView({
   scores,
   holeGroups,
   scoreByKey,
+  personalBests,
 }: {
   players: RoundPlayer[];
   scores: RoundScore[];
   holeGroups: RoundHole[][];
   scoreByKey: Map<string, RoundScore>;
+  personalBests?: RoundPersonalBest[] | null;
 }) {
   return (
     <Stack spacing={2}>
@@ -20,6 +27,7 @@ export function FinalStepView({
         players={players}
         scores={scores}
         holesInScope={holeGroups.flat()}
+        personalBests={personalBests}
       />
       {holeGroups.map((holes) => (
         <ScorecardGroupTable

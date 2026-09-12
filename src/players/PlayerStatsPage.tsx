@@ -19,15 +19,24 @@ import TableRow from "@mui/material/TableRow";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import {
+  getPersonalBests,
   getPlayerLayouts,
   getPlayerStats,
   getScoreDistribution,
   listPlayers,
 } from "./api";
-import type { HoleStat, Player, PlayedLayout, ScoreDistribution } from "./api";
+import type {
+  HoleStat,
+  PersonalBest,
+  Player,
+  PlayedLayout,
+  ScoreDistribution,
+} from "./api";
 import { ClaimedStatusChip } from "./ClaimedStatusChip";
 import { ScoreDistributionChart } from "./ScoreDistributionChart";
 import { useIdentity } from "../identity/useIdentity";
+import { relativeToPar } from "../rounds/scoreColor";
+import { formatDateTime } from "../shared/formatDateTime";
 import type { Status } from "../shared/status";
 
 export function PlayerStatsPage() {
@@ -42,21 +51,25 @@ export function PlayerStatsPage() {
   const [distribution, setDistribution] = useState<ScoreDistribution | null>(
     null,
   );
+  const [personalBests, setPersonalBests] = useState<PersonalBest[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
       try {
-        const [{ players }, { layouts }, { distribution }] = await Promise.all([
-          listPlayers(),
-          getPlayerLayouts(id),
-          getScoreDistribution(id),
-        ]);
+        const [{ players }, { layouts }, { distribution }, { personalBests }] =
+          await Promise.all([
+            listPlayers(),
+            getPlayerLayouts(id),
+            getScoreDistribution(id),
+            getPersonalBests(id),
+          ]);
         setPlayer(players.find((candidate) => candidate.id === id) ?? null);
         setLayouts(layouts);
         setLayoutId(layouts.length > 0 ? layouts[0].layoutId : "");
         setDistribution(distribution);
+        setPersonalBests(personalBests);
         setStatus("ready");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load player");
@@ -105,6 +118,41 @@ export function PlayerStatsPage() {
               />
             )}
           </Stack>
+
+          {personalBests.length > 0 && (
+            <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+              <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                Personal bests
+              </Typography>
+              <Stack spacing={1}>
+                {personalBests.map((best) => (
+                  <Stack
+                    key={best.layoutId}
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="baseline"
+                  >
+                    <Stack>
+                      <Typography variant="body2">
+                        {best.courseName} — {best.layoutName}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {formatDateTime(best.achievedAt)}
+                      </Typography>
+                    </Stack>
+                    <Link
+                      component={RouterLink}
+                      to={`/rounds/${best.roundId}`}
+                      underline="hover"
+                    >
+                      {best.totalStrokes} (
+                      {relativeToPar(best.totalStrokes, best.totalPar)})
+                    </Link>
+                  </Stack>
+                ))}
+              </Stack>
+            </Paper>
+          )}
 
           {distribution &&
             Object.values(distribution).some((count) => count > 0) && (

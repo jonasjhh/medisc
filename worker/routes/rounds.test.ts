@@ -366,6 +366,129 @@ describe("rounds API", () => {
     expect(completed.scores.every((s) => !s.recorded)).toBe(true);
   });
 
+  it("has no personal-bests data on an in-progress round", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const created = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+      roundDetailSchema,
+    );
+    expect(created.personalBests).toBeNull();
+  });
+
+  it("flags a fully-recorded round as a new personal best the first time", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const created = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+      roundDetailSchema,
+    );
+    for (const score of created.scores) {
+      await request(`/api/hole-scores/${score.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ strokes: 3 }),
+      });
+    }
+
+    const completed = await json(
+      await request(`/api/rounds/${created.id}/complete`, { method: "POST" }),
+      roundDetailSchema,
+    );
+    expect(completed.personalBests).toEqual([
+      {
+        playerId: alice.id,
+        totalStrokes: 6,
+        isNewBest: true,
+        previousBestStrokes: null,
+      },
+    ]);
+  });
+
+  it("does not flag a round with unrecorded holes as personal-best eligible", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+    const created = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+      roundDetailSchema,
+    );
+    // Only record one of the two holes.
+    await request(`/api/hole-scores/${created.scores[0].id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ strokes: 3 }),
+    });
+
+    const completed = await json(
+      await request(`/api/rounds/${created.id}/complete`, { method: "POST" }),
+      roundDetailSchema,
+    );
+    expect(completed.personalBests).toEqual([]);
+  });
+
+  it("flags isNewBest as false when a later round is worse than a prior best", async () => {
+    const { courseId, layoutId } = await setUpCourseWithTwoHoles();
+    const alice = await createPlayer("Alice");
+
+    const first = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+      roundDetailSchema,
+    );
+    for (const score of first.scores) {
+      await request(`/api/hole-scores/${score.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ strokes: 2 }),
+      });
+    }
+    await request(`/api/rounds/${first.id}/complete`, { method: "POST" });
+
+    const second = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [alice.id] }),
+      }),
+      roundDetailSchema,
+    );
+    for (const score of second.scores) {
+      await request(`/api/hole-scores/${score.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ strokes: 5 }),
+      });
+    }
+    const completedSecond = await json(
+      await request(`/api/rounds/${second.id}/complete`, { method: "POST" }),
+      roundDetailSchema,
+    );
+
+    expect(completedSecond.personalBests).toEqual([
+      {
+        playerId: alice.id,
+        totalStrokes: 10,
+        isNewBest: false,
+        previousBestStrokes: 4,
+      },
+    ]);
+  });
+
   it("reopens a completed round and allows editing scores again", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");

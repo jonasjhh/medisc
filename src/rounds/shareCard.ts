@@ -1,6 +1,11 @@
 import type { RoundDetail } from "./api";
 import { formatDateTime } from "../shared/formatDateTime";
-import { adjusterTextColors, badgeColors, scoreOutcome } from "./scoreColor";
+import {
+  adjusterTextColors,
+  badgeColors,
+  relativeToPar,
+  scoreOutcome,
+} from "./scoreColor";
 import type { ScoreOutcome } from "./scoreColor";
 import { formatWeather } from "./weather";
 
@@ -98,14 +103,6 @@ function courseTotals(holes: ShareCardHole[]): {
       ? knownDistances.reduce((sum, h) => sum + (h.distanceMeters ?? 0), 0)
       : null;
   return { totalPar, totalMeters };
-}
-
-function relativeToPar(total: number, par: number): string {
-  const diff = total - par;
-  if (diff === 0) {
-    return "E";
-  }
-  return diff > 0 ? `+${diff}` : `${diff}`;
 }
 
 export function buildShareCardData(round: RoundDetail): ShareCardData {

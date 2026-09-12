@@ -65,6 +65,7 @@ const baseRound: RoundDetail = {
     windDirectionDegrees: 208,
     symbolCode: "clearsky_day",
   },
+  personalBests: null,
 };
 
 describe("buildShareCardData", () => {

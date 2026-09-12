@@ -39,6 +39,7 @@ const baseRound: roundsApi.RoundDetail = {
     },
   ],
   weather: null,
+  personalBests: null,
 };
 
 describe("useRoundData", () => {

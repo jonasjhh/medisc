@@ -2,9 +2,11 @@ import { Hono } from "hono";
 import type { AppEnv } from "../types";
 import { createPlayerSchema, updatePlayerSchema } from "../schemas";
 import { parseIntParam } from "../params";
+import { getBestForLayout } from "../personalBests";
 import {
   holeBreakdownResponseSchema,
   holeStatsResponseSchema,
+  personalBestsResponseSchema,
   playedLayoutsResponseSchema,
   playerListResponseSchema,
   playerSchema,
@@ -277,6 +279,56 @@ playersRoute.get("/:playerId/layouts", async (c) => {
       })),
     }),
   );
+});
+
+playersRoute.get("/:playerId/personal-bests", async (c) => {
+  const playerId = parseIntParam(c.req.param("playerId"));
+  if (playerId === null) {
+    return c.json({ error: "Invalid player id" }, 400);
+  }
+
+  const player = await c.env.DB.prepare("SELECT id FROM players WHERE id = ?")
+    .bind(playerId)
+    .first();
+  if (!player) {
+    return c.json({ error: "Player not found" }, 404);
+  }
+
+  // Candidate layouts (any completed+counting round played there) — most
+  // won't actually have a fully-recorded round, so getBestForLayout below
+  // filters those back out.
+  const { results: layoutRows } = await c.env.DB.prepare(
+    `SELECT DISTINCT courses.id AS course_id, courses.name AS course_name,
+            layouts.id AS layout_id, layouts.name AS layout_name
+     FROM rounds
+     JOIN round_players ON round_players.round_id = rounds.id
+     JOIN courses ON courses.id = rounds.course_id
+     JOIN layouts ON layouts.id = rounds.layout_id
+     WHERE round_players.player_id = ?
+       AND rounds.completed_at IS NOT NULL
+       AND rounds.counting = 1
+     ORDER BY courses.name, layouts.name`,
+  )
+    .bind(playerId)
+    .all<PlayedLayoutRow>();
+
+  const personalBests = [];
+  for (const layout of layoutRows) {
+    const best = await getBestForLayout(c.env.DB, playerId, layout.layout_id);
+    if (!best) continue;
+    personalBests.push({
+      courseId: layout.course_id,
+      courseName: layout.course_name,
+      layoutId: layout.layout_id,
+      layoutName: layout.layout_name,
+      roundId: best.roundId,
+      achievedAt: best.achievedAt,
+      totalStrokes: best.totalStrokes,
+      totalPar: best.totalPar,
+    });
+  }
+
+  return c.json(personalBestsResponseSchema.parse({ personalBests }));
 });
 
 const RECENT_COURSES_LIMIT = 3;

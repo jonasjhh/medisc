@@ -36,6 +36,7 @@ const round: RoundDetail = {
     },
   ],
   weather: null,
+  personalBests: null,
 };
 
 const fakeContext = {

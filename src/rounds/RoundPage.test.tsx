@@ -47,6 +47,7 @@ const baseRound: roundsApi.RoundDetail = {
     },
   ],
   weather: null,
+  personalBests: null,
 };
 
 const twelveHoleRound: roundsApi.RoundDetail = {
@@ -72,6 +73,7 @@ const twelveHoleRound: roundsApi.RoundDetail = {
     recorded: false,
   })),
   weather: null,
+  personalBests: null,
 };
 
 function renderPage() {
@@ -724,6 +726,52 @@ describe("RoundPage", () => {
     await user.click(screen.getByRole("button", { name: /finish round/i }));
 
     expect(await screen.findByText("Summary")).toBeInTheDocument();
+  });
+
+  it("shows a new-personal-best chip when finishing sets one", async () => {
+    vi.mocked(roundsApi.completeRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+      personalBests: [
+        {
+          playerId: 1,
+          totalStrokes: 7,
+          isNewBest: true,
+          previousBestStrokes: 9,
+        },
+      ],
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: /finish round/i }));
+
+    expect(await screen.findByText("Summary")).toBeInTheDocument();
+    expect(screen.getByText("New personal best!")).toBeInTheDocument();
+  });
+
+  it("does not show a new-personal-best chip when finishing doesn't set one", async () => {
+    vi.mocked(roundsApi.completeRound).mockResolvedValue({
+      ...baseRound,
+      completedAt: "2026-01-01 12:00:00",
+      personalBests: [
+        {
+          playerId: 1,
+          totalStrokes: 9,
+          isNewBest: false,
+          previousBestStrokes: 7,
+        },
+      ],
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Hole 1");
+    await user.click(screen.getByRole("button", { name: /finish round/i }));
+
+    expect(await screen.findByText("Summary")).toBeInTheDocument();
+    expect(screen.queryByText("New personal best!")).not.toBeInTheDocument();
   });
 
   it("warns before finishing a round with unrecorded holes, and does nothing until confirmed", async () => {

@@ -3,6 +3,7 @@ import type { AppEnv } from "../types";
 import { createRoundSchema, updateRoundSchema } from "../schemas";
 import { parseIntParam } from "../params";
 import { fetchWeather } from "../weather";
+import { getBestForLayout } from "../personalBests";
 import {
   roundDetailSchema,
   roundListResponseSchema,
@@ -125,6 +126,49 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
       .all<HoleScoreRow>(),
   ]);
 
+  const players = playerRows.map((player) => ({
+    id: player.id,
+    name: player.name,
+  }));
+  const scores = scoreRows.map((score) => ({
+    id: score.id,
+    holeId: score.hole_id,
+    playerId: score.player_id,
+    strokes: score.strokes,
+    penalties: score.penalties,
+    recorded: Boolean(score.recorded),
+  }));
+
+  let personalBests = null;
+  if (round.completed_at) {
+    personalBests = [];
+    for (const player of players) {
+      const recordedScores = scores.filter(
+        (score) => score.playerId === player.id && score.recorded,
+      );
+      if (recordedScores.length !== holeRows.length) {
+        continue; // not every hole was scored this round — not PB-eligible
+      }
+      const totalStrokes = recordedScores.reduce(
+        (sum, score) => sum + score.strokes,
+        0,
+      );
+      const previousBest = await getBestForLayout(
+        db,
+        player.id,
+        round.layout_id,
+        roundId,
+      );
+      personalBests.push({
+        playerId: player.id,
+        totalStrokes,
+        isNewBest:
+          previousBest === null || totalStrokes < previousBest.totalStrokes,
+        previousBestStrokes: previousBest?.totalStrokes ?? null,
+      });
+    }
+  }
+
   return roundDetailSchema.parse({
     id: round.id,
     createdAt: round.created_at,
@@ -138,16 +182,10 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
       par: hole.par,
       distanceMeters: hole.distance_meters,
     })),
-    players: playerRows.map((player) => ({ id: player.id, name: player.name })),
-    scores: scoreRows.map((score) => ({
-      id: score.id,
-      holeId: score.hole_id,
-      playerId: score.player_id,
-      strokes: score.strokes,
-      penalties: score.penalties,
-      recorded: Boolean(score.recorded),
-    })),
+    players,
+    scores,
     weather: weatherFromRow(round),
+    personalBests,
   });
 }
 

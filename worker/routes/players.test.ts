@@ -5,6 +5,7 @@ import app from "../index";
 import { seedCourse, seedUser } from "../test/seed";
 import {
   holeBreakdownResponseSchema,
+  personalBestsResponseSchema,
   playedLayoutsResponseSchema,
   playerListResponseSchema,
   playerSchema,
@@ -478,6 +479,228 @@ describe("player stats", () => {
     expect(layouts).toEqual([
       { courseId, courseName: "Maple Hill", layoutId, layoutName: "Blue" },
     ]);
+  });
+
+  async function playFullRound(
+    courseId: number,
+    layoutId: number,
+    playerId: number,
+    strokesByHoleNumber: Record<number, number>,
+    options?: { counting?: boolean },
+  ) {
+    const round = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [playerId] }),
+      }),
+      roundDetailSchema,
+    );
+    for (const hole of round.holes) {
+      const strokes = strokesByHoleNumber[hole.number];
+      const score = round.scores.find((s) => s.holeId === hole.id)!;
+      await request(`/api/hole-scores/${score.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ strokes }),
+      });
+    }
+    if (options?.counting === false) {
+      await request(`/api/rounds/${round.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ counting: false }),
+      });
+    }
+    await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
+    return round;
+  }
+
+  it("returns no personal bests before any fully-recorded round", async () => {
+    const player = await json(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+      playerSchema,
+    );
+
+    const { personalBests } = await json(
+      await request(`/api/players/${player.id}/personal-bests`),
+      personalBestsResponseSchema,
+    );
+    expect(personalBests).toEqual([]);
+  });
+
+  it("records a personal best after a fully-recorded round", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [
+        { number: 1, par: 3 },
+        { number: 2, par: 4 },
+      ],
+    });
+    const player = await json(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+      playerSchema,
+    );
+
+    const round = await playFullRound(courseId, layoutId, player.id, {
+      1: 3,
+      2: 4,
+    });
+
+    const { personalBests } = await json(
+      await request(`/api/players/${player.id}/personal-bests`),
+      personalBestsResponseSchema,
+    );
+    expect(personalBests).toEqual([
+      {
+        courseId,
+        courseName: "Maple Hill",
+        layoutId,
+        layoutName: "Blue",
+        roundId: round.id,
+        achievedAt: expect.any(String),
+        totalStrokes: 7,
+        totalPar: 7,
+      },
+    ]);
+  });
+
+  it("replaces the personal best when a later round scores lower", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const player = await json(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+      playerSchema,
+    );
+
+    await playFullRound(courseId, layoutId, player.id, { 1: 4 });
+    const better = await playFullRound(courseId, layoutId, player.id, {
+      1: 2,
+    });
+
+    const { personalBests } = await json(
+      await request(`/api/players/${player.id}/personal-bests`),
+      personalBestsResponseSchema,
+    );
+    expect(personalBests).toHaveLength(1);
+    expect(personalBests[0].roundId).toBe(better.id);
+    expect(personalBests[0].totalStrokes).toBe(2);
+  });
+
+  it("keeps the personal best when a later round scores worse", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const player = await json(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+      playerSchema,
+    );
+
+    const best = await playFullRound(courseId, layoutId, player.id, {
+      1: 2,
+    });
+    await playFullRound(courseId, layoutId, player.id, { 1: 4 });
+
+    const { personalBests } = await json(
+      await request(`/api/players/${player.id}/personal-bests`),
+      personalBestsResponseSchema,
+    );
+    expect(personalBests).toHaveLength(1);
+    expect(personalBests[0].roundId).toBe(best.id);
+    expect(personalBests[0].totalStrokes).toBe(2);
+  });
+
+  it("excludes a round where not every hole was recorded", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [
+        { number: 1, par: 3 },
+        { number: 2, par: 3 },
+      ],
+    });
+    const player = await json(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+      playerSchema,
+    );
+
+    // Only hole 1 gets scored; hole 2 is left unrecorded.
+    const round = await json(
+      await request("/api/rounds", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, layoutId, playerIds: [player.id] }),
+      }),
+      roundDetailSchema,
+    );
+    await request(`/api/hole-scores/${round.scores[0].id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ strokes: 3 }),
+    });
+    await request(`/api/rounds/${round.id}/complete`, { method: "POST" });
+
+    const { personalBests } = await json(
+      await request(`/api/players/${player.id}/personal-bests`),
+      personalBestsResponseSchema,
+    );
+    expect(personalBests).toEqual([]);
+  });
+
+  it("excludes non-counting rounds", async () => {
+    const { courseId, layoutId } = await seedCourse(env, {
+      courseName: "Maple Hill",
+      layoutName: "Blue",
+      holes: [{ number: 1, par: 3 }],
+    });
+    const player = await json(
+      await request("/api/players", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Alice" }),
+      }),
+      playerSchema,
+    );
+
+    await playFullRound(
+      courseId,
+      layoutId,
+      player.id,
+      { 1: 2 },
+      { counting: false },
+    );
+
+    const { personalBests } = await json(
+      await request(`/api/players/${player.id}/personal-bests`),
+      personalBestsResponseSchema,
+    );
+    expect(personalBests).toEqual([]);
   });
 
   it("aggregates hole stats across completed rounds only", async () => {
