@@ -22,7 +22,6 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import Toolbar from "@mui/material/Toolbar";
-import Typography from "@mui/material/Typography";
 import { HomePage } from "./pages/HomePage";
 import { CoursesPage } from "./courses/CoursesPage";
 import { NewRoundPage } from "./rounds/NewRoundPage";
@@ -176,14 +175,18 @@ function NavBar() {
   return (
     <AppBar position="static" elevation={0}>
       <Toolbar>
-        <Typography
-          variant="h6"
+        <Box
           component={RouterLink}
           to="/"
-          sx={{ flexGrow: 1, color: "inherit", textDecoration: "none" }}
+          sx={{ flexGrow: 1, display: "flex", alignItems: "center" }}
         >
-          Medisc
-        </Typography>
+          <Box
+            component="img"
+            src="/logo.png"
+            alt="Medisc"
+            sx={{ height: 36 }}
+          />
+        </Box>
         <Stack direction="row" component="nav" aria-label="Main" spacing={0.5}>
           <Button color="inherit" component={RouterLink} to="/rounds">
             Rounds

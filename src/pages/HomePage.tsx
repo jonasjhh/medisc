@@ -20,9 +20,14 @@ export function HomePage() {
           gap: 3,
         }}
       >
-        <Typography variant="h3" component="h1" fontWeight={600}>
-          Medisc
-        </Typography>
+        <Box component="h1" sx={{ m: 0, lineHeight: 0 }}>
+          <Box
+            component="img"
+            src="/logo.png"
+            alt="Medisc"
+            sx={{ height: { xs: 72, sm: 96 }, width: "auto" }}
+          />
+        </Box>
         <Typography variant="body1" color="text.secondary">
           Track your disc golf rounds, hole by hole.
         </Typography>
