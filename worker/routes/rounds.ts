@@ -162,7 +162,7 @@ async function buildRoundDetail(db: D1Database, roundId: number) {
       personalBests.push({
         playerId: player.id,
         totalStrokes,
-        isNewBest:
+        isBest:
           previousBest === null || totalStrokes < previousBest.totalStrokes,
         previousBestStrokes: previousBest?.totalStrokes ?? null,
       });

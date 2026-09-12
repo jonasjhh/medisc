@@ -380,7 +380,7 @@ describe("rounds API", () => {
     expect(created.personalBests).toBeNull();
   });
 
-  it("flags a fully-recorded round as a new personal best the first time", async () => {
+  it("flags a fully-recorded round as the personal best the first time", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
     const created = await json(
@@ -407,7 +407,7 @@ describe("rounds API", () => {
       {
         playerId: alice.id,
         totalStrokes: 6,
-        isNewBest: true,
+        isBest: true,
         previousBestStrokes: null,
       },
     ]);
@@ -438,7 +438,7 @@ describe("rounds API", () => {
     expect(completed.personalBests).toEqual([]);
   });
 
-  it("flags isNewBest as false when a later round is worse than a prior best", async () => {
+  it("flags isBest as false when a later round is worse than a prior best", async () => {
     const { courseId, layoutId } = await setUpCourseWithTwoHoles();
     const alice = await createPlayer("Alice");
 
@@ -483,7 +483,7 @@ describe("rounds API", () => {
       {
         playerId: alice.id,
         totalStrokes: 10,
-        isNewBest: false,
+        isBest: false,
         previousBestStrokes: 4,
       },
     ]);

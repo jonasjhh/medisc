@@ -41,8 +41,8 @@ export function TotalsList({
           (sum, score) => sum + (parByHoleId.get(score.holeId) ?? 0),
           0,
         );
-        const isNewBest = personalBests?.some(
-          (pb) => pb.playerId === player.id && pb.isNewBest,
+        const isBest = personalBests?.some(
+          (pb) => pb.playerId === player.id && pb.isBest,
         );
         return (
           <Stack
@@ -54,8 +54,8 @@ export function TotalsList({
             <Typography fontWeight={600}>
               {player.name}: {total} ({relativeToPar(total, par)})
             </Typography>
-            {isNewBest && (
-              <Chip label="New personal best!" color="success" size="small" />
+            {isBest && (
+              <Chip label="Personal best" color="success" size="small" />
             )}
           </Stack>
         );

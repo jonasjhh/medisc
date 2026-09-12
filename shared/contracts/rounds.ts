@@ -50,7 +50,7 @@ export type RoundWeather = z.infer<typeof roundWeatherSchema>;
 export const roundPersonalBestSchema = z.object({
   playerId: z.number(),
   totalStrokes: z.number(),
-  isNewBest: z.boolean(),
+  isBest: z.boolean(),
   previousBestStrokes: z.number().nullable(),
 });
 export type RoundPersonalBest = z.infer<typeof roundPersonalBestSchema>;

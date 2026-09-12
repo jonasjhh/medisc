@@ -728,7 +728,7 @@ describe("RoundPage", () => {
     expect(await screen.findByText("Summary")).toBeInTheDocument();
   });
 
-  it("shows a new-personal-best chip when finishing sets one", async () => {
+  it("shows a personal-best chip when finishing sets one", async () => {
     vi.mocked(roundsApi.completeRound).mockResolvedValue({
       ...baseRound,
       completedAt: "2026-01-01 12:00:00",
@@ -736,7 +736,7 @@ describe("RoundPage", () => {
         {
           playerId: 1,
           totalStrokes: 7,
-          isNewBest: true,
+          isBest: true,
           previousBestStrokes: 9,
         },
       ],
@@ -748,10 +748,10 @@ describe("RoundPage", () => {
     await user.click(screen.getByRole("button", { name: /finish round/i }));
 
     expect(await screen.findByText("Summary")).toBeInTheDocument();
-    expect(screen.getByText("New personal best!")).toBeInTheDocument();
+    expect(screen.getByText("Personal best")).toBeInTheDocument();
   });
 
-  it("does not show a new-personal-best chip when finishing doesn't set one", async () => {
+  it("does not show a personal-best chip when finishing doesn't set one", async () => {
     vi.mocked(roundsApi.completeRound).mockResolvedValue({
       ...baseRound,
       completedAt: "2026-01-01 12:00:00",
@@ -759,7 +759,7 @@ describe("RoundPage", () => {
         {
           playerId: 1,
           totalStrokes: 9,
-          isNewBest: false,
+          isBest: false,
           previousBestStrokes: 7,
         },
       ],
@@ -771,7 +771,7 @@ describe("RoundPage", () => {
     await user.click(screen.getByRole("button", { name: /finish round/i }));
 
     expect(await screen.findByText("Summary")).toBeInTheDocument();
-    expect(screen.queryByText("New personal best!")).not.toBeInTheDocument();
+    expect(screen.queryByText("Personal best")).not.toBeInTheDocument();
   });
 
   it("warns before finishing a round with unrecorded holes, and does nothing until confirmed", async () => {
